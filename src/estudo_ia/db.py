@@ -24,7 +24,6 @@ class Livro(SQLModel, table=True):
     arquivo: str = Field(unique=True)  # nome do arquivo em biblioteca/
     formato: str  # pdf, epub, mobi...
     total_paginas: int | None = None
-    file_search_id: str | None = None  # id do documento no Gemini File Search
     criado_em: datetime = Field(default_factory=agora)
 
 
@@ -36,6 +35,7 @@ class Capitulo(SQLModel, table=True):
     pagina_inicio: int | None = None
     pagina_fim: int | None = None
     texto: str = ""  # texto extraído, só para uso local
+    file_search_doc: str | None = None  # documento deste capítulo no Gemini File Search
 
 
 class Sessao(SQLModel, table=True):

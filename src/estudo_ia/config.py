@@ -31,6 +31,12 @@ class Config:
 
     # Dados que não são segredos.
     provedor_texto: str = "claude"  # "claude" ou "gemini"
+
+    # Nomes de modelos mudam com frequência: ficam aqui, nunca espalhados pelo código.
+    # Conferidos na documentação do Gemini em 29/10/2026.
+    gemini_modelo_texto: str = "gemini-3.8-flash"
+    gemini_modelo_reserva: str = "gemini-3.6-flash"  # usado se o principal estiver sobrecarregado
+    gemini_modelo_embedding: str = "models/gemini-embedding-2"
     telegram_chat_id: str = ""
     email_destino: str = ""
     gmail_remetente: str = ""
@@ -90,6 +96,9 @@ def carregar_config(arquivo_env: str | Path | None = ".env") -> Config:
         telegram_bot_token=ler("TELEGRAM_BOT_TOKEN"),
         gmail_senha_de_app=ler("GMAIL_SENHA_DE_APP"),
         provedor_texto=provedor,
+        gemini_modelo_texto=ler("GEMINI_MODELO_TEXTO", "gemini-3.8-flash"),
+        gemini_modelo_reserva=ler("GEMINI_MODELO_RESERVA", "gemini-3.6-flash"),
+        gemini_modelo_embedding=ler("GEMINI_MODELO_EMBEDDING", "models/gemini-embedding-2"),
         telegram_chat_id=ler("TELEGRAM_CHAT_ID"),
         email_destino=ler("EMAIL_DESTINO"),
         gmail_remetente=ler("GMAIL_REMETENTE"),
