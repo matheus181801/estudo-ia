@@ -16,19 +16,24 @@ from telegram import Update
 from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
+from estudo_ia.bot import roteador
 from estudo_ia.bot.formatacao import dividir, markdown_para_html, normalizar
 from estudo_ia.config import Config
 from estudo_ia.db import Livro, abrir_sessao
 from estudo_ia.ingestao import file_search
 from estudo_ia.ingestao.biblioteca import listar_livros
+from estudo_ia.leitura import claude_livro
 from estudo_ia.trilha import planejador
 
 log = logging.getLogger(__name__)
 
 AJUDA = """<b>Estudo IA</b> 📚
 
-Mande qualquer pergunta sobre os seus livros e eu respondo citando livro e capítulo.
+Mande qualquer pergunta e eu respondo citando livro e capítulo.
+Perguntas sobre o livro da trilha são respondidas pelo Claude, que lê o livro inteiro.
+Para buscar em toda a biblioteca, use /geral ou fale em "outros livros".
 
+/geral &lt;pergunta&gt; — pergunta sobre toda a biblioteca
 /livros — lista os livros da biblioteca
 /livro &lt;número ou nome&gt; — escolhe o livro da trilha
 /status — em que ponto da trilha você está
@@ -66,6 +71,7 @@ def criar_app(config: Config, engine) -> Application:
 
     cliente = file_search.criar_cliente(config)
     store = file_search.obter_store(cliente, config)
+    cliente_claude = claude_livro.criar_cliente(config)
     so_matheus = filters.Chat(chat_id=int(config.telegram_chat_id))
 
     async def cmd_ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -129,21 +135,49 @@ def criar_app(config: Config, engine) -> Application:
     async def cmd_pacote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🛠️ O pacote diário chega na Fase 3. Por enquanto, pergunte o que quiser sobre os livros!")
 
-    async def pergunta(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        aviso = await update.message.reply_text("🔎 Buscando nos livros...")
+    def responder_com_gemini(texto: str) -> str:
+        resposta = file_search.perguntar(cliente, store, config, texto)
+        return resposta.texto or "Não encontrei resposta nos livros."
+
+    def responder_pergunta(texto: str, forcar_geral: bool = False) -> str:
+        """Escolhe Claude (livro da trilha) ou Gemini (biblioteca toda)."""
+        situacao = planejador.situacao_atual(engine)
+        caminho = roteador.GEMINI if forcar_geral else \
+            roteador.escolher_caminho(texto, tem_livro_ativo=situacao is not None)
+        if caminho == roteador.CLAUDE:
+            try:
+                resposta = claude_livro.perguntar_livro(cliente_claude, config, engine, situacao.livro.id, texto)
+                if not resposta.recusou:
+                    return resposta.texto
+                log.warning("Claude recusou a pergunta; usando o Gemini")
+            except Exception:
+                log.exception("Falha no Claude; usando o Gemini")
+        return responder_com_gemini(texto)
+
+    async def processar(update: Update, texto: str, forcar_geral: bool = False):
+        origem = "toda a biblioteca" if forcar_geral else "nos livros"
+        aviso = await update.message.reply_text(f"🔎 Buscando {origem}...")
         await update.message.chat.send_action(ChatAction.TYPING)
         try:
-            # A chamada ao Gemini é "bloqueante"; rodamos numa thread para o bot
+            # As chamadas às IAs são "bloqueantes"; rodamos numa thread para o bot
             # continuar respondendo enquanto espera.
-            resposta = await asyncio.to_thread(
-                file_search.perguntar, cliente, store, config, update.message.text
-            )
+            texto_resposta = await asyncio.to_thread(responder_pergunta, texto, forcar_geral)
         except Exception as erro:
             log.exception("Erro ao responder pergunta")
             await aviso.edit_text(f"😕 Não consegui responder agora ({type(erro).__name__}). Tente de novo em instantes.")
             return
         await aviso.delete()
-        await responder(update, resposta.texto or "Não encontrei resposta nos livros.")
+        await responder(update, texto_resposta)
+
+    async def pergunta(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await processar(update, update.message.text)
+
+    async def cmd_geral(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        texto = " ".join(context.args)
+        if not texto:
+            await update.message.reply_text("Escreva a pergunta depois do comando: /geral o que é RAG?")
+            return
+        await processar(update, texto, forcar_geral=True)
 
     app = Application.builder().token(config.telegram_bot_token).build()
     app.add_handler(CommandHandler(["start", "ajuda", "help"], cmd_ajuda, filters=so_matheus))
@@ -153,6 +187,7 @@ def criar_app(config: Config, engine) -> Application:
     app.add_handler(CommandHandler("proximo", cmd_proximo, filters=so_matheus))
     app.add_handler(CommandHandler("pular", cmd_pular, filters=so_matheus))
     app.add_handler(CommandHandler("pacote", cmd_pacote, filters=so_matheus))
+    app.add_handler(CommandHandler("geral", cmd_geral, filters=so_matheus))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & so_matheus, pergunta))
     return app
 

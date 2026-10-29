@@ -77,3 +77,26 @@ def test_dividir_respeita_limite():
     assert len(partes) > 1
     assert all(len(p) <= 4000 for p in partes)
     assert "".join(partes).replace("\n", "") == texto.replace("\n", "")
+
+
+def test_roteador_modelo_hibrido():
+    from estudo_ia.bot.roteador import CLAUDE, GEMINI, escolher_caminho
+
+    # Com livro na trilha, pergunta comum vai para o Claude.
+    assert escolher_caminho("O que é a fronteira irregular?", tem_livro_ativo=True) == CLAUDE
+    # Falar de outros livros ou da biblioteca manda para o Gemini (mesmo com acento).
+    assert escolher_caminho("Compare com os outros livros", tem_livro_ativo=True) == GEMINI
+    assert escolher_caminho("O que a Biblioteca diz sobre RAG?", tem_livro_ativo=True) == GEMINI
+    assert escolher_caminho("Qual a diferença entre os autores?", tem_livro_ativo=True) == GEMINI
+    # Sem livro na trilha, sempre Gemini.
+    assert escolher_caminho("O que é RAG?", tem_livro_ativo=False) == GEMINI
+
+
+def test_documentos_do_claude_tem_cache_no_fim():
+    from estudo_ia.leitura.claude_livro import montar_documentos
+
+    livro = Livro(titulo="Livro", autor="Autora", arquivo="l.pdf", formato="pdf")
+    docs = montar_documentos(livro, [cap(1, 100, 1, 2), cap(2, 100, 3, 4)])
+    assert [d["title"] for d in docs] == ["Cap. 1: Cap 1", "Cap. 2: Cap 2"]
+    assert "cache_control" in docs[-1] and "cache_control" not in docs[0]
+    assert all("citations" not in d for d in docs)  # citações desligadas (direitos autorais)

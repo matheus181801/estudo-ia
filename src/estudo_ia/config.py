@@ -37,6 +37,8 @@ class Config:
     gemini_modelo_texto: str = "gemini-3.8-flash"
     gemini_modelo_reserva: str = "gemini-3.6-flash"  # usado se o principal estiver sobrecarregado
     gemini_modelo_embedding: str = "models/gemini-embedding-2"
+    # Claude lê o livro da trilha inteiro (escolha do Matheus: Haiku 5.5, o mais barato).
+    claude_modelo: str = "claude-haiku-5-5"
     telegram_chat_id: str = ""
     email_destino: str = ""
     gmail_remetente: str = ""
@@ -99,6 +101,7 @@ def carregar_config(arquivo_env: str | Path | None = ".env") -> Config:
         gemini_modelo_texto=ler("GEMINI_MODELO_TEXTO", "gemini-3.8-flash"),
         gemini_modelo_reserva=ler("GEMINI_MODELO_RESERVA", "gemini-3.6-flash"),
         gemini_modelo_embedding=ler("GEMINI_MODELO_EMBEDDING", "models/gemini-embedding-2"),
+        claude_modelo=ler("CLAUDE_MODELO", "claude-haiku-5-5"),
         telegram_chat_id=ler("TELEGRAM_CHAT_ID"),
         email_destino=ler("EMAIL_DESTINO"),
         gmail_remetente=ler("GMAIL_REMETENTE"),
