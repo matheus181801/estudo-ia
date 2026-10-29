@@ -1,0 +1,65 @@
+{#- Newsletter no corpo do e-mail.
+    Clientes de e-mail (Gmail, Outlook) ignoram muito CSS, por isso os estilos
+    ficam "inline" em cada elemento e o layout é uma coluna simples. -#}
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ c.titulo }}</title></head>
+<body style="margin:0;padding:0;background:#f3f0ff;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1f1b2e;">
+<div style="max-width:640px;margin:0 auto;padding:16px;">
+
+  <div style="background:linear-gradient(135deg,#6d28d9,#db2777);background-color:#6d28d9;border-radius:20px;padding:28px 24px;color:#ffffff;">
+    <div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;opacity:.85;">📚 Estudo IA · Sessão {{ p.sessao_ordem }} de {{ p.sessao_total }} · {{ data_br }}</div>
+    <h1 style="margin:10px 0 6px;font-size:28px;line-height:1.2;">{{ c.titulo }}</h1>
+    <div style="font-size:14px;opacity:.9;">{{ p.livro }} — {{ p.autor }}</div>
+  </div>
+
+  <div style="background:#ffffff;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:17px;line-height:1.6;border-left:6px solid #f59e0b;">
+    {{ c.abertura | paragrafos }}
+  </div>
+
+  {% for s in c.secoes %}
+  <div style="background:#ffffff;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:16px;line-height:1.65;">
+    <h2 style="margin:0 0 10px;font-size:20px;color:#6d28d9;">{{ s.emoji }} {{ s.titulo }}</h2>
+    {{ s.texto | paragrafos }}
+  </div>
+  {% endfor %}
+
+  <div style="background:#fef3c7;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:16px;line-height:1.6;">
+    <h2 style="margin:0 0 10px;font-size:20px;color:#b45309;">🎯 5 ideias para levar</h2>
+    <ol style="margin:0;padding-left:22px;">{% for i in c.ideias_chave %}<li style="margin-bottom:6px;">{{ i | inline }}</li>{% endfor %}</ol>
+  </div>
+
+  <div style="background:#dcfce7;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:16px;line-height:1.6;">
+    <h2 style="margin:0 0 10px;font-size:20px;color:#15803d;">💼 Na prática</h2>
+    {{ c.na_pratica | paragrafos }}
+  </div>
+
+  <div style="background:#e0f2fe;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:16px;line-height:1.6;">
+    <h2 style="margin:0 0 12px;font-size:20px;color:#0369a1;">🇺🇸 Inglês técnico do dia</h2>
+    {% for t in c.ingles %}
+    <div style="margin-bottom:12px;">
+      <b style="font-size:17px;">{{ t.termo }}</b> <span style="color:#475569;">— {{ t.traducao }}</span><br>
+      {{ t.explicacao | inline }}<br>
+      <i style="color:#0369a1;">“{{ t.exemplo }}”</i>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="background:#fce7f3;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:16px;line-height:1.6;">
+    <h2 style="margin:0 0 10px;font-size:20px;color:#be185d;">🤯 Curiosidade</h2>
+    {{ c.curiosidade | paragrafos }}
+  </div>
+
+  <div style="background:#1f1b2e;border-radius:16px;padding:20px 22px;margin-top:14px;font-size:15px;line-height:1.6;color:#e9e5ff;">
+    📎 No PDF anexo: {{ c.multipla_escolha | length }} questões de múltipla escolha, {{ c.abertas | length }} abertas
+    {%- if p.revisao %}, {{ p.revisao | length }} de revisão{% endif %} e o gabarito comentado no final.<br>
+    🎧 Podcast e 🎬 vídeo da sessão chegam pelo Telegram.
+  </div>
+
+  <p style="text-align:center;font-size:12px;color:#6b7280;margin-top:18px;">
+    Capítulos de hoje: {{ p.capitulos | join(" · ") }}<br>
+    Explicações originais geradas por IA a partir do livro. Bons estudos! 🚀
+  </p>
+</div>
+</body>
+</html>

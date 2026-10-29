@@ -23,6 +23,7 @@ from estudo_ia.db import Livro, abrir_sessao
 from estudo_ia.ingestao import file_search
 from estudo_ia.ingestao.biblioteca import listar_livros
 from estudo_ia.leitura import claude_livro
+from estudo_ia.pacote.servico import criar_pacote
 from estudo_ia.trilha import planejador
 
 log = logging.getLogger(__name__)
@@ -133,7 +134,17 @@ def criar_app(config: Config, engine) -> Application:
             await update.message.reply_text("Não há sessão para pular. Escolha um livro com /livro")
 
     async def cmd_pacote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("🛠️ O pacote diário chega na Fase 3. Por enquanto, pergunte o que quiser sobre os livros!")
+        aviso = await update.message.reply_text("🛠️ Gerando o pacote da próxima sessão... leva uns 2 minutos.")
+        try:
+            arquivos = await asyncio.to_thread(criar_pacote, engine, config, False, log.info)
+        except Exception as erro:
+            log.exception("Erro ao gerar pacote")
+            await aviso.edit_text(f"😕 Não consegui gerar o pacote: {erro}")
+            return
+        await aviso.delete()
+        with open(arquivos.pdf, "rb") as pdf:
+            await update.message.reply_document(pdf, filename=f"{arquivos.pasta.name}.pdf",
+                                                caption=f"📚 {arquivos.titulo}")
 
     def responder_com_gemini(texto: str) -> str:
         resposta = file_search.perguntar(cliente, store, config, texto)

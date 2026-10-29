@@ -8,6 +8,7 @@ uma coluna. O SQLite é um banco inteiro dentro de um único arquivo
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import inspect, text
 from sqlmodel import Field, Session, SQLModel, create_engine
 
 
@@ -69,6 +70,7 @@ class Pacote(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     sessao_id: int = Field(foreign_key="sessao.id", index=True)
     data: date
+    caminho_json: str | None = None  # conteúdo completo (usado na revisão espaçada)
     caminho_pdf: str | None = None
     caminho_html: str | None = None
     caminho_mp3: str | None = None
@@ -79,11 +81,31 @@ class Pacote(SQLModel, table=True):
     criado_em: datetime = Field(default_factory=agora)
 
 
+def _migrar_colunas_novas(engine) -> None:
+    """Migração simples: acrescenta colunas novas em tabelas que já existem.
+
+    O `create_all` cria tabelas que faltam, mas não altera as existentes.
+    Quando acrescentamos um campo numa classe acima, esta função cria a
+    coluna no banco (vazia), sem apagar nenhum dado.
+    """
+    inspetor = inspect(engine)
+    with engine.begin() as conexao:
+        for tabela in SQLModel.metadata.sorted_tables:
+            if not inspetor.has_table(tabela.name):
+                continue
+            existentes = {c["name"] for c in inspetor.get_columns(tabela.name)}
+            for coluna in tabela.columns:
+                if coluna.name not in existentes:
+                    tipo = coluna.type.compile(engine.dialect)
+                    conexao.execute(text(f'ALTER TABLE {tabela.name} ADD COLUMN "{coluna.name}" {tipo}'))
+
+
 def criar_engine(caminho_banco: Path):
     """Abre (ou cria) o arquivo do banco e garante que as tabelas existem."""
     caminho_banco.parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{caminho_banco}")
     SQLModel.metadata.create_all(engine)
+    _migrar_colunas_novas(engine)
     return engine
 
 

@@ -21,6 +21,8 @@ def main() -> None:
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
+    pacote = sub.add_parser("pacote", help="gera o pacote da próxima sessão")
+    pacote.add_argument("--teste", action="store_true", help="gera em data/pacotes/teste sem registrar no banco")
     args = parser.parse_args()
 
     config = carregar_config()
@@ -69,6 +71,14 @@ def main() -> None:
         print("\nFontes encontradas pela busca:")
         for fonte in resposta.fontes:
             print(f"  - {fonte}")
+
+    elif args.comando == "pacote":
+        from estudo_ia.pacote.servico import criar_pacote
+
+        arquivos = criar_pacote(engine, config, teste=args.teste)
+        print(f"Pacote pronto: {arquivos.titulo}")
+        print(f"  HTML: {arquivos.html}")
+        print(f"  PDF:  {arquivos.pdf}")
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar

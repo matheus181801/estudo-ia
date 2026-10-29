@@ -1,0 +1,101 @@
+{#- PDF do pacote: newsletter, questões e, no final, o gabarito comentado.
+    Tamanho A5 com letra grande, para ler bem no celular. -#}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>{{ c.titulo }}</title>
+<style>
+  @page { size: A5; margin: 12mm 11mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; color: #1f1b2e; font-size: 11.5pt; line-height: 1.55; margin: 0; }
+  h1 { font-size: 21pt; line-height: 1.15; margin: 6px 0 4px; }
+  h2 { font-size: 14pt; margin: 0 0 6px; break-after: avoid; }
+  p { margin: 0 0 8px; }
+  .capa { background: linear-gradient(135deg, #6d28d9, #db2777); color: #fff; border-radius: 14px; padding: 18px; }
+  .capa small { text-transform: uppercase; letter-spacing: 1px; opacity: .85; font-size: 8pt; }
+  /* Cards longos podem quebrar entre páginas (senão sobra espaço em branco). */
+  .card { border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+  p { orphans: 3; widows: 3; }
+  .branco { background: #faf8ff; border: 1px solid #ede9fe; }
+  .roxo h2 { color: #6d28d9; }
+  .amarelo { background: #fef3c7; } .amarelo h2 { color: #b45309; }
+  .verde { background: #dcfce7; } .verde h2 { color: #15803d; }
+  .azul { background: #e0f2fe; } .azul h2 { color: #0369a1; }
+  .rosa { background: #fce7f3; } .rosa h2 { color: #be185d; }
+  .quebra { break-before: page; }
+  .titulo-parte { font-size: 16pt; color: #6d28d9; border-bottom: 3px solid #f59e0b; padding-bottom: 4px; margin: 0 0 10px; }
+  .questao { margin-bottom: 12px; break-inside: avoid; }
+  .questao .n { display: inline-block; background: #6d28d9; color: #fff; border-radius: 6px; padding: 0 7px; font-weight: bold; margin-right: 4px; }
+  .questao ol { list-style: upper-alpha; margin: 4px 0 0; padding-left: 24px; }
+  .linhas { border-bottom: 1px dashed #c4b5fd; height: 22px; }
+  .gabarito .questao { font-size: 10.5pt; }
+  .certa { color: #15803d; font-weight: bold; }
+  .rodape { text-align: center; font-size: 8pt; color: #6b7280; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <small>📚 Estudo IA · Sessão {{ p.sessao_ordem }} de {{ p.sessao_total }} · {{ data_br }}</small>
+  <h1>{{ c.titulo }}</h1>
+  <div>{{ p.livro }} — {{ p.autor }}</div>
+</div>
+
+<div class="card branco">{{ c.abertura | paragrafos }}</div>
+
+{% for s in c.secoes %}
+<div class="card branco roxo"><h2>{{ s.emoji }} {{ s.titulo }}</h2>{{ s.texto | paragrafos }}</div>
+{% endfor %}
+
+<div class="card amarelo"><h2>🎯 5 ideias para levar</h2>
+  <ol>{% for i in c.ideias_chave %}<li>{{ i | inline }}</li>{% endfor %}</ol></div>
+<div class="card verde"><h2>💼 Na prática</h2>{{ c.na_pratica | paragrafos }}</div>
+<div class="card azul"><h2>🇺🇸 Inglês técnico do dia</h2>
+  {% for t in c.ingles %}<p><b>{{ t.termo }}</b> — {{ t.traducao }}<br>{{ t.explicacao | inline }}<br><i>“{{ t.exemplo }}”</i></p>{% endfor %}</div>
+<div class="card rosa"><h2>🤯 Curiosidade</h2>{{ c.curiosidade | paragrafos }}</div>
+
+{# ---------- Questões ---------- #}
+<div class="quebra"></div>
+{% if p.revisao %}
+<h2 class="titulo-parte">🔁 Revisão de sessões anteriores</h2>
+{% for q in p.revisao %}
+<div class="questao"><span class="n">R{{ loop.index }}</span>{{ q.enunciado | inline }}
+  <ol>{% for a in q.alternativas %}<li>{{ a | inline }}</li>{% endfor %}</ol></div>
+{% endfor %}
+{% endif %}
+
+<h2 class="titulo-parte">✅ Múltipla escolha</h2>
+{% for q in c.multipla_escolha %}
+<div class="questao"><span class="n">{{ loop.index }}</span>{{ q.enunciado | inline }}
+  <ol>{% for a in q.alternativas %}<li>{{ a | inline }}</li>{% endfor %}</ol></div>
+{% endfor %}
+
+<h2 class="titulo-parte">✍️ Questões abertas</h2>
+{% for q in c.abertas %}
+<div class="questao"><span class="n">{{ c.multipla_escolha | length + loop.index }}</span>{{ q.enunciado | inline }}
+  <div class="linhas"></div><div class="linhas"></div><div class="linhas"></div></div>
+{% endfor %}
+
+{# ---------- Gabarito ---------- #}
+<div class="quebra"></div>
+<div class="gabarito">
+<h2 class="titulo-parte">🔑 Gabarito comentado</h2>
+{% if p.revisao %}
+{% for q in p.revisao %}
+<div class="questao"><span class="n">R{{ loop.index }}</span>
+  <span class="certa">{{ "ABCD"[q.correta] }}) {{ q.alternativas[q.correta] | inline }}</span><br>{{ q.comentario | inline }}</div>
+{% endfor %}
+{% endif %}
+{% for q in c.multipla_escolha %}
+<div class="questao"><span class="n">{{ loop.index }}</span>
+  <span class="certa">{{ "ABCD"[q.correta] }}) {{ q.alternativas[q.correta] | inline }}</span><br>{{ q.comentario | inline }}</div>
+{% endfor %}
+{% for q in c.abertas %}
+<div class="questao"><span class="n">{{ c.multipla_escolha | length + loop.index }}</span>{{ q.resposta_esperada | inline }}</div>
+{% endfor %}
+</div>
+
+<div class="rodape">Capítulos: {{ p.capitulos | join(" · ") }}<br>Explicações originais geradas por IA a partir do livro.</div>
+</body>
+</html>
