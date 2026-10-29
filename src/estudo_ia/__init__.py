@@ -20,6 +20,7 @@ def main() -> None:
     sub.add_parser("livros", help="lista os livros e o número de capítulos")
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
+    sub.add_parser("bot", help="liga o bot do Telegram")
     args = parser.parse_args()
 
     config = carregar_config()
@@ -68,3 +69,8 @@ def main() -> None:
         print("\nFontes encontradas pela busca:")
         for fonte in resposta.fontes:
             print(f"  - {fonte}")
+
+    elif args.comando == "bot":
+        from estudo_ia.bot.app import rodar
+
+        rodar(config, engine)

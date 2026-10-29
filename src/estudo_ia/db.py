@@ -46,6 +46,10 @@ class Sessao(SQLModel, table=True):
     ordem: int
     capitulo_inicio_id: int = Field(foreign_key="capitulo.id")
     capitulo_fim_id: int = Field(foreign_key="capitulo.id")
+    # Um capítulo muito longo pode virar mais de uma sessão; por isso guardamos as páginas.
+    pagina_inicio: int
+    pagina_fim: int
+    caracteres: int = 0  # tamanho do texto da sessão (mede o esforço de leitura)
     status: str = "pendente"  # pendente, entregue, pulada
     data_prevista: date | None = None
 
@@ -55,8 +59,7 @@ class Progresso(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     livro_id: int = Field(foreign_key="livro.id", index=True)
-    sessao_atual_id: int | None = Field(default=None, foreign_key="sessao.id")
-    ativo: bool = True
+    ativo: bool = True  # só um livro fica ativo por vez
     atualizado_em: datetime = Field(default_factory=agora)
 
 
