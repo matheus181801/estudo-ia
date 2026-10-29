@@ -1,0 +1,10 @@
+.env
+biblioteca/*
+!biblioteca/LEIA-ME.md
+data/
+__pycache__/
+.venv/
+*.mp3
+*.mp4
+.pytest_cache/
+*.db

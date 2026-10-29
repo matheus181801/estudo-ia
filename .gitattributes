@@ -1,0 +1,2 @@
+# Mantém finais de linha no padrão Linux (LF), que é o da VPS/Docker.
+* text=auto eol=lf
