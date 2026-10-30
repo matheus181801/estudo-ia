@@ -63,6 +63,7 @@ class Config:
     drive_ponte_url: str = field(default="", repr=False)
     drive_ponte_chave: str = field(default="", repr=False)
     hora_entrega_mba: str = "06:30"
+    mba_gerar_video: bool = True  # False pula o vídeo (gerado depois com `estudo-ia mba --videos`)
 
     # Pastas.
     data_dir: Path = Path("./data")
@@ -136,6 +137,7 @@ def carregar_config(arquivo_env: str | Path | None = ".env") -> Config:
         drive_ponte_url=ler("DRIVE_PONTE_URL"),
         drive_ponte_chave=ler("DRIVE_PONTE_CHAVE"),
         hora_entrega_mba=ler("HORA_ENTREGA_MBA", "06:30"),
+        mba_gerar_video=ler("MBA_GERAR_VIDEO", "sim").lower() not in ("nao", "não", "false", "0"),
         data_dir=Path(ler("DATA_DIR", "./data")),
         biblioteca_dir=Path(ler("BIBLIOTECA_DIR", "./biblioteca")),
     )

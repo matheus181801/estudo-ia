@@ -27,6 +27,8 @@ def main() -> None:
     mba = sub.add_parser("mba", help="aulas do MBA: busca no Drive, processa e entrega")
     mba.add_argument("--entregar-ja", action="store_true", help="entrega as prontas agora (sem esperar 06:30)")
     mba.add_argument("--so-listar", action="store_true", help="só mostra as aulas encontradas")
+    mba.add_argument("--sem-video", action="store_true", help="pula o vídeo (gera depois com --videos)")
+    mba.add_argument("--videos", action="store_true", help="gera e envia os vídeos que ficaram faltando")
     diario = sub.add_parser("diario", help="gera o pacote completo da próxima sessão e entrega")
     diario.add_argument("--so-gerar", action="store_true", help="só gera (texto, podcast e vídeo)")
     diario.add_argument("--so-entregar", action="store_true", help="só entrega o pacote já gerado")
@@ -154,10 +156,15 @@ def main() -> None:
     elif args.comando == "mba":
         from estudo_ia.mba import processador
 
+        if args.sem_video:
+            from dataclasses import replace
+            config = replace(config, mba_gerar_video=False)
         if args.so_listar:
             processador.sincronizar(engine, config, processador.criar_ponte(config))
             processador.Progresso(config).atualizar(engine)
             print(f"Progresso em {config.data_dir / 'mba' / 'progresso.json'}")
+        elif args.videos:
+            processador.gerar_videos_pendentes(engine, config)
         else:
             processador.ciclo(engine, config, entregar_ja=args.entregar_ja)
 
