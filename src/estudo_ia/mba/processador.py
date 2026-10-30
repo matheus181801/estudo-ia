@@ -222,7 +222,7 @@ def processar_aula(engine, config: Config, ponte: PonteDrive, aula_id: int,
         pacote = Pacote.model_validate_json((pasta / "pacote.json").read_text(encoding="utf-8"))
         # Podcast e vídeo enriquecem, mas não travam a aula: se falharem, ela segue sem eles.
         # O que já existe não é refeito (nem pago de novo).
-        if not (pasta / "podcast.mp3").exists():
+        if config.mba_gerar_podcast and not (pasta / "podcast.mp3").exists():
             try:
                 from estudo_ia.podcast.servico import gerar_podcast
                 passo("Gerando o podcast curto...")
@@ -365,14 +365,15 @@ def entregar_aula(engine, config: Config, ponte: PonteDrive, aula_id: int, avisa
 
 # ---------------------------------------------------------------- vídeos depois
 
-def gerar_videos_pendentes(engine, config: Config, avisar=print) -> int:
-    """Gera os vídeos que ficaram faltando (ex.: lote feito com o vídeo desligado).
+def gerar_midias_pendentes(engine, config: Config, avisar=print) -> int:
+    """Gera podcasts e vídeos que ficaram faltando (ex.: lote feito com eles desligados).
 
-    Para cada aula pronta ou entregue sem video.mp4: gera o vídeo, salva no Drive
-    e, se a aula já foi entregue, manda o vídeo no tópico da matéria.
+    Para cada aula pronta ou entregue sem podcast.mp3 ou video.mp4: gera o que
+    falta, salva no Drive e, se a aula já foi entregue, manda no tópico da matéria.
     """
     from estudo_ia.mba import telegram_mba
     from estudo_ia.pacote.modelos import Pacote
+    from estudo_ia.podcast.servico import gerar_podcast
     from estudo_ia.video.servico import gerar_video
 
     ponte = criar_ponte(config)
@@ -383,24 +384,30 @@ def gerar_videos_pendentes(engine, config: Config, avisar=print) -> int:
                         .where(AulaMBA.etapa.in_(["pronta", "entregue"])).order_by(AulaMBA.data)).all()
     for aula, materia in linhas:
         pasta = Path(aula.pasta_local)
-        if (pasta / "video.mp4").exists() or not (pasta / "pacote.json").exists():
+        if not (pasta / "pacote.json").exists():
             continue
-        progresso.atualizar(engine, atual=aula.titulo, detalhe="Gerando o vídeo que ficou faltando...")
-        try:
-            pacote = Pacote.model_validate_json((pasta / "pacote.json").read_text(encoding="utf-8"))
-            video = gerar_video(pacote, pasta, config, avisar=lambda t: avisar(f"[{aula.titulo}] {t}"))
-            ponte.salvar([materia.nome, aula.titulo], "video.mp4", video.mp4.read_bytes(), "video/mp4")
-            if aula.etapa == "entregue":
-                telegram_mba.enviar_no_topico(
-                    config, materia.topico_id,
-                    f"🎬 Vídeo-aula de revisão da aula de {aula.data.strftime('%d/%m')} (chegou depois)",
-                    [(video.mp4, "🎬 Vídeo-aula de revisão")])
-            feitos += 1
-            avisar(f"Vídeo pronto: {aula.titulo}")
-        except Exception as erro:
-            log.exception("Vídeo pendente falhou")
-            avisar(f"! Vídeo de {aula.titulo} falhou de novo ({type(erro).__name__}); tento na próxima.")
-    progresso.atualizar(engine, atual="", detalhe=f"Vídeos pendentes: {feitos} gerados.")
+        pacote = Pacote.model_validate_json((pasta / "pacote.json").read_text(encoding="utf-8"))
+        tarefas = [
+            ("podcast.mp3", "audio/mpeg", "🎧 Podcast da aula", lambda: gerar_podcast(pacote, pasta, config, avisar=avisar).mp3),
+            ("video.mp4", "video/mp4", "🎬 Vídeo-aula de revisão", lambda: gerar_video(pacote, pasta, config, avisar=avisar).mp4),
+        ]
+        for nome, tipo, legenda, gerar in tarefas:
+            if (pasta / nome).exists():
+                continue
+            progresso.atualizar(engine, atual=aula.titulo, detalhe=f"Gerando o que ficou faltando: {legenda}...")
+            try:
+                arquivo = gerar()
+                ponte.salvar([materia.nome, aula.titulo], nome, arquivo.read_bytes(), tipo)
+                if aula.etapa == "entregue":
+                    telegram_mba.enviar_no_topico(
+                        config, materia.topico_id,
+                        f"{legenda} da aula de {aula.data.strftime('%d/%m')} (chegou depois)", [(arquivo, legenda)])
+                feitos += 1
+                avisar(f"Pronto: {legenda} de {aula.titulo}")
+            except Exception as erro:
+                log.exception("Mídia pendente falhou")
+                avisar(f"! {legenda} de {aula.titulo} falhou de novo ({type(erro).__name__}); tento na próxima.")
+    progresso.atualizar(engine, atual="", detalhe=f"Mídias pendentes: {feitos} geradas.")
     return feitos
 
 
