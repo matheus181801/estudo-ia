@@ -13,6 +13,10 @@ from telegram.request import HTTPXRequest
 from estudo_ia.config import Config
 
 LIMITE_MB = 50  # bots do Telegram enviam arquivos de até 50 MB
+# Os métodos de envio de arquivo da biblioteca usam por padrão só 20 s para
+# o upload (e ignoram o que foi configurado no cliente). Um MP3 de 12 MB não
+# sobe nesse tempo numa conexão comum, então passamos o limite em cada envio.
+TEMPOS = {"write_timeout": 300, "read_timeout": 120, "connect_timeout": 30}
 
 
 def _bot(config: Config) -> Bot:
@@ -36,13 +40,13 @@ async def _enviar_arquivos(config: Config, arquivos: list[tuple[Path, str]]) -> 
             with open(caminho, "rb") as arquivo:
                 if caminho.suffix == ".mp3":
                     await bot.send_audio(config.telegram_chat_id, arquivo, caption=legenda,
-                                         title=legenda, filename=caminho.name)
+                                         title=legenda, filename=caminho.name, **TEMPOS)
                 elif caminho.suffix == ".mp4":
                     await bot.send_video(config.telegram_chat_id, arquivo, caption=legenda,
-                                         supports_streaming=True, filename=caminho.name)
+                                         supports_streaming=True, filename=caminho.name, **TEMPOS)
                 else:
                     await bot.send_document(config.telegram_chat_id, arquivo, caption=legenda,
-                                            filename=caminho.name)
+                                            filename=caminho.name, **TEMPOS)
     return avisos
 
 
