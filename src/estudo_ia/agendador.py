@@ -95,11 +95,30 @@ def criar_agendador(config: Config, engine) -> BackgroundScheduler:
         lambda: log.info("Limpeza: %s", limpar_antigos(config) or "nada a apagar"),
         CronTrigger(hour=3, minute=0, timezone=config.fuso), id="limpar",
     )
+    if mba_configurado(config):
+        from estudo_ia.mba import processador
+
+        # A cada 30 min: procura aulas novas no Drive, processa e entrega as que
+        # já passaram das 06:30 do dia seguinte. max_instances=1 (padrão) evita
+        # duas rodadas ao mesmo tempo quando uma aula demora.
+        agendador.add_job(
+            lambda: _com_retentativas("a rodada do MBA",
+                                      lambda: processador.ciclo(engine, config, avisar=log.info),
+                                      config, tentativas=1),
+            CronTrigger(minute="0,30", timezone=config.fuso), id="mba",
+        )
     return agendador
 
 
+def mba_configurado(config: Config) -> bool:
+    return bool(config.telegram_bot_token_mba and config.telegram_grupo_mba_id
+                and config.drive_ponte_url and config.drive_ponte_chave)
+
+
 def rodar_servico(config: Config, engine) -> None:
-    """O que o container roda: agendador em segundo plano + bot no processo principal."""
+    """O que o container roda: agendador em segundo plano + os bots no processo principal."""
+    import asyncio
+
     from estudo_ia.bot.app import criar_app
 
     configurar_logs(config)
@@ -107,6 +126,25 @@ def rodar_servico(config: Config, engine) -> None:
     agendador.start()
     for job in agendador.get_jobs():
         log.info("Agendado: %s → próxima execução %s", job.id, job.next_run_time)
-    app = criar_app(config, engine)
-    log.info("Serviço Estudo IA no ar.")
-    app.run_polling()
+
+    apps = [criar_app(config, engine)]
+    if mba_configurado(config):
+        from estudo_ia.mba.bot_mba import criar_app_mba
+        apps.append(criar_app_mba(config, engine))
+
+    async def rodar_bots():
+        # Vários bots no mesmo processo: cada um faz o seu long polling.
+        for app in apps:
+            await app.initialize()
+            await app.start()
+            await app.updater.start_polling()
+        log.info("Serviço Estudo IA no ar (%d bot%s).", len(apps), "s" if len(apps) > 1 else "")
+        try:
+            await asyncio.Event().wait()  # roda até o container ser parado
+        finally:
+            for app in apps:
+                await app.updater.stop()
+                await app.stop()
+                await app.shutdown()
+
+    asyncio.run(rodar_bots())

@@ -22,7 +22,7 @@ from pathlib import Path
 from sqlmodel import select
 
 from estudo_ia.config import Config
-from estudo_ia.db import AulaMBA, Materia, abrir_sessao
+from estudo_ia.db import AulaMBA, Materia, abrir_sessao, agora
 from estudo_ia.mba.aulas import (MATERIA_GERAL, anonimizar_transcricao, escolher_arquivos,
                                  identificar_aula, texto_docx, texto_pdf)
 from estudo_ia.mba.drive import PonteDrive
@@ -89,7 +89,7 @@ def _salvar(engine, aula: AulaMBA, **campos) -> AulaMBA:
         atual = s.get(AulaMBA, aula.id)
         for nome, valor in campos.items():
             setattr(atual, nome, valor)
-        atual.atualizado_em = datetime.now()
+        atual.atualizado_em = agora()
         s.add(atual)
         s.commit()
         s.refresh(atual)

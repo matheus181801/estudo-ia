@@ -148,3 +148,43 @@ def test_sincronizar_importa_processadas_e_registra_novas(tmp_path):
     assert materia.topico_id == 42  # tópico recuperado do Drive: não cria tópico duplicado
     # Rodar de novo não duplica nada.
     assert processador.sincronizar(engine, Config(data_dir=tmp_path), PonteFalsa(), avisar=lambda *_: None) == []
+
+
+def test_bot_mba_usa_notas_da_materia_do_topico(tmp_path):
+    from estudo_ia.mba.bot_mba import materia_do_topico, notas_das_aulas
+    from estudo_ia.mba.filtro import NotasAula
+
+    engine = criar_engine(tmp_path / "t.db")
+    with abrir_sessao(engine) as s:
+        ia, vibe = Materia(nome="Estratégia de IA", topico_id=7), Materia(nome="Vibe Coding", topico_id=9)
+        s.add(ia)
+        s.add(vibe)
+        s.commit()
+        for materia, dia in ((ia, 22), (vibe, 15)):
+            pasta = tmp_path / str(dia)
+            pasta.mkdir()
+            notas = NotasAula(titulo_aula=f"Aula {dia}", resumo="r", topicos=[], perguntas_relevantes=[],
+                              conceitos_chave=[], avisos=[])
+            (pasta / "notas.json").write_text(notas.model_dump_json(), encoding="utf-8")
+            s.add(AulaMBA(pasta_id=str(dia), titulo=str(dia), data=date(2026, 10, dia),
+                          materia_id=materia.id, pasta_local=str(pasta)))
+        s.commit()
+    assert materia_do_topico(engine, 7).nome == "Estratégia de IA"
+    assert materia_do_topico(engine, None) is None  # tópico Geral
+    assert [r for r, _ in notas_das_aulas(engine, materia_do_topico(engine, 7).id)] == \
+        ["Estratégia de IA · aula de 22/10: Aula 22"]
+    assert len(notas_das_aulas(engine, None)) == 2  # Geral: todas as matérias
+
+
+def test_salvar_etapa_grava_no_banco(tmp_path):
+    engine = criar_engine(tmp_path / "t.db")
+    with abrir_sessao(engine) as s:
+        m = Materia(nome="X")
+        s.add(m)
+        s.commit()
+        aula = AulaMBA(pasta_id="p", titulo="t", data=date(2026, 10, 1), materia_id=m.id)
+        s.add(aula)
+        s.commit()
+        s.refresh(aula)
+    atualizada = processador._salvar(engine, aula, etapa="notas", professor="Igor")
+    assert (atualizada.etapa, atualizada.professor) == ("notas", "Igor")

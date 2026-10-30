@@ -64,3 +64,13 @@ def test_importar_recusa_arquivo_que_nao_e_banco(tmp_path):
     with pytest.raises(ValueError):
         instalar_banco(lixo, destino)
     assert destino.read_bytes() == b"banco atual"  # nada foi trocado
+
+
+def test_rodada_do_mba_so_entra_com_tudo_configurado(tmp_path):
+    engine = criar_engine(tmp_path / "t.db")
+    sem_mba = {j.id for j in criar_agendador(Config(data_dir=tmp_path), engine).get_jobs()}
+    assert "mba" not in sem_mba
+    com_mba = Config(data_dir=tmp_path, telegram_bot_token_mba="t", telegram_grupo_mba_id="-1",
+                     drive_ponte_url="https://x/exec", drive_ponte_chave="k")
+    jobs = {j.id: j for j in criar_agendador(com_mba, engine).get_jobs()}
+    assert "minute='0,30'" in str(jobs["mba"].trigger)
