@@ -191,7 +191,7 @@ def gerar_pacote(engine, config: Config, cliente: anthropic.Anthropic, sessao_id
 
     avisar("Pesquisando os conceitos na web...")
     try:
-        pesquisa = pesquisar_conceitos(cliente, config, livro, texto)
+        pesquisa = pesquisar_conceitos(cliente, config, f"{livro.titulo} — {livro.autor}", texto)
     except Exception as erro:
         # A pesquisa enriquece o pacote, mas não é essencial: sem ela, seguimos só com o livro.
         avisar(f"! Pesquisa web falhou ({type(erro).__name__}); seguindo só com o livro.")

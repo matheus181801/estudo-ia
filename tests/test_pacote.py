@@ -149,7 +149,7 @@ def test_pesquisa_pega_fontes_da_busca_real_sem_repetir():
         _BlocoFalso(type="text", text="originais.", citations=None),
     ]
     livro = Livro(titulo="L", autor="A", arquivo="l.pdf", formato="pdf")
-    resultado = pesquisar_conceitos(_ClienteFalso(blocos), Config(), livro, "texto")
+    resultado = pesquisar_conceitos(_ClienteFalso(blocos), Config(), livro.titulo, "texto")
     assert resultado.notas == "Notas originais."
     # A citada vem primeiro, e a URL repetida não aparece duas vezes.
     assert [f.url for f in resultado.fontes] == ["https://a.org", "https://b.org"]

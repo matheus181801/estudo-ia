@@ -61,6 +61,17 @@ class MidiaPacote(BaseModel):
     fonte_podcast: str = Field(description="Notas de estudo originais, de 1.500 a 2.000 palavras")
 
 
+class TermoGlossario(BaseModel):
+    termo: str
+    explicacao: str = Field(description="Explicação do zero, para quem não é da área de tecnologia")
+
+
+class ConexaoLivro(BaseModel):
+    livro: str = Field(description="Título do livro, exatamente como na lista de trechos encontrados")
+    capitulo: str = Field(description="Capítulo, exatamente como na lista de trechos encontrados")
+    por_que_ler: str = Field(description="O que esse trecho acrescenta ao conteúdo da aula (1 frase)")
+
+
 class FonteWeb(BaseModel):
     """Fonte encontrada na pesquisa web (vem da busca real, não do modelo)."""
 
@@ -81,3 +92,8 @@ class Pacote(BaseModel):
     midia: MidiaPacote
     revisao: list[QuestaoMultipla] = []
     fontes_web: list[FonteWeb] = []
+    # Campos usados só nos pacotes de aula do MBA (tipo="aula").
+    tipo: str = "livro"
+    glossario: list[TermoGlossario] = []
+    conexoes_livros: list[ConexaoLivro] = []
+    avisos: list[str] = []

@@ -14,19 +14,18 @@ from dataclasses import dataclass, field
 import anthropic
 
 from estudo_ia.config import Config
-from estudo_ia.db import Livro
 from estudo_ia.pacote.modelos import FonteWeb
 
 MAX_BUSCAS = 5  # cada busca custa cerca de US$ 0,01
 
-PEDIDO_PESQUISA = """Leia o trecho do livro acima e identifique os 3 conceitos centrais da sessão.
-Depois pesquise na web para aprofundar cada conceito além do livro: definições de outras fontes,
+PEDIDO_PESQUISA = """Leia o texto acima e identifique os 3 conceitos centrais da sessão.
+Depois pesquise na web para aprofundar cada conceito além do texto: definições de outras fontes,
 exemplos reais e recentes (empresas, produtos, casos), números, debates e críticas.
 Prefira fontes confiáveis: artigos acadêmicos, documentação oficial, institutos de pesquisa e
 veículos de tecnologia reconhecidos.
 
 Escreva notas de pesquisa em português do Brasil, com as suas palavras (não copie trechos),
-organizadas por conceito: o que a web acrescenta ao que o livro diz."""
+organizadas por conceito: o que a web acrescenta ao que o texto diz."""
 
 
 @dataclass
@@ -35,15 +34,16 @@ class ResultadoPesquisa:
     fontes: list[FonteWeb] = field(default_factory=list)
 
 
-def pesquisar_conceitos(cliente: anthropic.Anthropic, config: Config, livro: Livro,
+def pesquisar_conceitos(cliente: anthropic.Anthropic, config: Config, titulo_fonte: str,
                         texto: str) -> ResultadoPesquisa:
+    """Pesquisa na web os conceitos de um texto (trecho de livro ou notas de aula)."""
     mensagens = [{
         "role": "user",
         "content": [
             {
                 "type": "document",
                 "source": {"type": "text", "media_type": "text/plain", "data": texto},
-                "title": f"{livro.titulo} — {livro.autor}",
+                "title": titulo_fonte,
             },
             {"type": "text", "text": PEDIDO_PESQUISA},
         ],

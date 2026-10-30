@@ -41,9 +41,15 @@
 <body>
 
 <div class="capa">
+  {% if p.tipo == "aula" %}
+  <small>🎓 MBA · {{ p.livro }} · Aula {{ p.sessao_ordem }} · {{ data_br }}</small>
+  <h1>{{ c.titulo }}</h1>
+  <div>Prof. {{ p.autor }} — {{ p.capitulos[0] }}</div>
+  {% else %}
   <small>📚 Estudo IA · Sessão {{ p.sessao_ordem }} de {{ p.sessao_total }} · {{ data_br }}</small>
   <h1>{{ c.titulo }}</h1>
   <div>{{ p.livro }} — {{ p.autor }}</div>
+  {% endif %}
 </div>
 
 <div class="card branco">{{ c.abertura | paragrafos }}</div>
@@ -53,12 +59,24 @@
   {% if s.analogia %}<div class="analogia">💡 <b>Pensa assim:</b> {{ s.analogia | inline }}</div>{% endif %}</div>
 {% endfor %}
 
+{% if p.glossario %}
+<div class="card branco roxo"><h2>🧩 Glossário para iniciantes</h2>
+  {% for t in p.glossario %}<p><b>{{ t.termo }}</b>: {{ t.explicacao | inline }}</p>{% endfor %}</div>
+{% endif %}
 <div class="card amarelo"><h2>🎯 5 ideias para levar</h2>
   <ol>{% for i in c.ideias_chave %}<li>{{ i | inline }}</li>{% endfor %}</ol></div>
 <div class="card verde"><h2>💼 Na prática</h2>{{ c.na_pratica | paragrafos }}</div>
 <div class="card azul"><h2>🇺🇸 Inglês técnico do dia</h2>
   {% for t in c.ingles %}<p><b>{{ t.termo }}</b> — {{ t.traducao }}<br>{{ t.explicacao | inline }}<br><i>“{{ t.exemplo }}”</i></p>{% endfor %}</div>
 <div class="card rosa"><h2>🤯 Curiosidade</h2>{{ c.curiosidade | paragrafos }}</div>
+{% if p.conexoes_livros %}
+<div class="card branco roxo"><h2>📚 Nos seus livros</h2>
+  {% for l in p.conexoes_livros %}<p><b>{{ l.livro }}</b> · {{ l.capitulo }}<br>{{ l.por_que_ler | inline }}</p>{% endfor %}</div>
+{% endif %}
+{% if p.avisos %}
+<div class="card rosa"><h2>📌 Avisos da aula</h2>
+  <ul>{% for a in p.avisos %}<li>{{ a | inline }}</li>{% endfor %}</ul></div>
+{% endif %}
 {% if p.fontes_web %}
 <div class="card branco roxo"><h2>🔗 Para ir além</h2>
   <ul class="fontes">{% for f in p.fontes_web %}<li><a href="{{ f.url }}">{{ f.titulo }}</a><br><span class="url">{{ f.url }}</span></li>{% endfor %}</ul></div>
@@ -105,6 +123,10 @@
 {% endfor %}
 </div>
 
+{% if p.tipo == "aula" %}
+<div class="rodape">Aula: {{ p.capitulos[0] }}<br>Explicações originais geradas por IA a partir da aula, de pesquisa na web e dos seus livros.</div>
+{% else %}
 <div class="rodape">Capítulos: {{ p.capitulos | join(" · ") }}<br>Explicações originais geradas por IA a partir do livro e de pesquisa na web.</div>
+{% endif %}
 </body>
 </html>

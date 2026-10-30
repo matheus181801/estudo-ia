@@ -81,6 +81,31 @@ class Pacote(SQLModel, table=True):
     criado_em: datetime = Field(default_factory=agora)
 
 
+class Materia(SQLModel, table=True):
+    """Uma matéria do MBA. Cada uma tem um tópico próprio no grupo do Telegram."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    nome: str = Field(unique=True)
+    topico_id: int | None = None  # message_thread_id do tópico no grupo
+
+
+class AulaMBA(SQLModel, table=True):
+    """Uma aula do MBA encontrada no Drive e o andamento do seu processamento."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    pasta_id: str = Field(unique=True)  # id da pasta no Google Drive
+    titulo: str  # nome da pasta
+    data: date
+    materia_id: int = Field(foreign_key="materia.id", index=True)
+    professor: str = ""
+    # nova → notas → pacote → midia → pronta → entregue  (ou erro)
+    etapa: str = "nova"
+    erro: str | None = None
+    pasta_local: str | None = None  # onde ficam notas, pacote, PDF, MP3 e MP4
+    criado_em: datetime = Field(default_factory=agora)
+    atualizado_em: datetime = Field(default_factory=agora)
+
+
 def _migrar_colunas_novas(engine) -> None:
     """Migração simples: acrescenta colunas novas em tabelas que já existem.
 
