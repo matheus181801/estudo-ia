@@ -105,7 +105,7 @@ uv run estudo-ia servico           # bot + agendador (o que roda no container)
 uv run pytest                      # 47 testes
 ```
 
-Em produção, o [Dockerfile](Dockerfile) empacota Python, ffmpeg, Chromium e fontes. O volume `/data` guarda banco, pacotes e logs.
+Em produção, o [Dockerfile](Dockerfile) empacota Python, ffmpeg, Chromium e fontes. O volume `/data` guarda banco, pacotes e logs. Cada `git push` na `main` dispara um webhook que faz o EasyPanel reconstruir e reiniciar o serviço (deploy contínuo).
 
 ## Estrutura
 
