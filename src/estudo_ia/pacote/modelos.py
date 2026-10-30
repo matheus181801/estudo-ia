@@ -10,8 +10,9 @@ from pydantic import BaseModel, Field
 
 class Secao(BaseModel):
     emoji: str = Field(description="Um emoji que represente a seção")
-    titulo: str
-    texto: str = Field(description="Explicação original, 2 a 4 parágrafos curtos")
+    titulo: str = Field(description="Título divertido e curioso")
+    texto: str = Field(description="Explicação original e leve, 2 a 4 parágrafos curtos")
+    analogia: str = Field(description="Uma analogia do dia a dia que faz o conceito 'clicar' (1 a 3 frases)")
 
 
 class Termo(BaseModel):
@@ -60,6 +61,13 @@ class MidiaPacote(BaseModel):
     fonte_podcast: str = Field(description="Notas de estudo originais, de 1.500 a 2.000 palavras")
 
 
+class FonteWeb(BaseModel):
+    """Fonte encontrada na pesquisa web (vem da busca real, não do modelo)."""
+
+    titulo: str
+    url: str
+
+
 class Pacote(BaseModel):
     """O pacote completo, como é salvo em disco (pacote.json)."""
 
@@ -72,3 +80,4 @@ class Pacote(BaseModel):
     conteudo: ConteudoPacote
     midia: MidiaPacote
     revisao: list[QuestaoMultipla] = []
+    fontes_web: list[FonteWeb] = []

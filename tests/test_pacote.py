@@ -5,7 +5,7 @@ from datetime import date
 
 from estudo_ia.db import Capitulo, Livro, Pacote as PacoteDB, Sessao, abrir_sessao, criar_engine
 from estudo_ia.pacote.gerador import conferir_conteudo, escolher_revisao, texto_da_sessao
-from estudo_ia.pacote.modelos import (ConteudoPacote, MidiaPacote, Pacote, QuestaoAberta,
+from estudo_ia.pacote.modelos import (ConteudoPacote, FonteWeb, MidiaPacote, Pacote, QuestaoAberta,
                                       QuestaoMultipla, Secao, Slide, Termo)
 from estudo_ia.pacote.renderizar import renderizar_html
 
@@ -14,7 +14,8 @@ def pacote_falso(prefixo: str = "Q") -> Pacote:
     conteudo = ConteudoPacote(
         titulo="Título <da> edição",
         abertura="Gancho **forte**.",
-        secoes=[Secao(emoji="🧠", titulo="Seção", texto="Parágrafo 1.\n\nParágrafo 2.")],
+        secoes=[Secao(emoji="🧠", titulo="Seção", texto="Parágrafo 1.\n\nParágrafo 2.",
+                      analogia="Como um GPS teimoso.")],
         ideias_chave=[f"Ideia {i}" for i in range(5)],
         na_pratica="Aplique.",
         curiosidade="Curioso.",
@@ -27,7 +28,8 @@ def pacote_falso(prefixo: str = "Q") -> Pacote:
     )
     midia = MidiaPacote(roteiro_video=[Slide(titulo="s", topicos=["t"], narracao="n")], fonte_podcast="notas")
     return Pacote(livro="Livro", autor="Autora", sessao_ordem=2, sessao_total=7, capitulos=["Cap 1"],
-                  data="2026-10-29", conteudo=conteudo, midia=midia)
+                  data="2026-10-29", conteudo=conteudo, midia=midia,
+                  fontes_web=[FonteWeb(titulo="Artigo sobre HITL", url="https://exemplo.org/hitl")])
 
 
 def test_conferir_conteudo_aponta_problemas():
@@ -44,6 +46,8 @@ def test_html_do_email_e_do_pdf():
     email = renderizar_html(p, "email.html.j2")
     assert "Título &lt;da&gt; edição" in email  # texto da IA não quebra o HTML
     assert "<b>forte</b>" in email and "29 de outubro de 2026" in email
+    assert "Pensa assim" in email and "Como um GPS teimoso." in email
+    assert 'href="https://exemplo.org/hitl"' in email  # seção "Para ir além"
     pdf = renderizar_html(p, "pdf.html.j2")
     assert "Gabarito comentado" in pdf
     assert "B) b" in pdf  # questão 1 tem correta=1 → letra B
@@ -104,3 +108,48 @@ def test_migracao_acrescenta_coluna_nova(tmp_path):
     colunas = {linha[1] for linha in con.execute("PRAGMA table_info(pacote)")}
     assert "caminho_json" in colunas and "status" in colunas
     assert con.execute("SELECT count(*) FROM pacote").fetchone()[0] == 1
+
+
+class _BlocoFalso:
+    def __init__(self, **campos):
+        self.__dict__.update(campos)
+
+
+class _ClienteFalso:
+    """Imita o cliente da Anthropic devolvendo uma resposta pronta da busca web."""
+
+    def __init__(self, blocos):
+        resposta = _BlocoFalso(content=blocos, stop_reason="end_turn")
+        stream = _BlocoFalso(get_final_message=lambda: resposta)
+        self.messages = _BlocoFalso(stream=lambda **_: _Contexto(stream))
+
+
+class _Contexto:
+    def __init__(self, valor):
+        self.valor = valor
+
+    def __enter__(self):
+        return self.valor
+
+    def __exit__(self, *_):
+        return False
+
+
+def test_pesquisa_pega_fontes_da_busca_real_sem_repetir():
+    from estudo_ia.config import Config
+    from estudo_ia.pacote.pesquisa import pesquisar_conceitos
+
+    citacao = _BlocoFalso(title="Fonte citada", url="https://a.org")
+    blocos = [
+        _BlocoFalso(type="web_search_tool_result", content=[
+            _BlocoFalso(title="Outra fonte", url="https://b.org"),
+            _BlocoFalso(title="Fonte citada", url="https://a.org"),
+        ]),
+        _BlocoFalso(type="text", text="Notas ", citations=[citacao]),
+        _BlocoFalso(type="text", text="originais.", citations=None),
+    ]
+    livro = Livro(titulo="L", autor="A", arquivo="l.pdf", formato="pdf")
+    resultado = pesquisar_conceitos(_ClienteFalso(blocos), Config(), livro, "texto")
+    assert resultado.notas == "Notas originais."
+    # A citada vem primeiro, e a URL repetida não aparece duas vezes.
+    assert [f.url for f in resultado.fontes] == ["https://a.org", "https://b.org"]

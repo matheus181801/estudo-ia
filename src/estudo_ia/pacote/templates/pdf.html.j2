@@ -31,6 +31,10 @@
   .linhas { border-bottom: 1px dashed #c4b5fd; height: 22px; }
   .gabarito .questao { font-size: 10.5pt; }
   .certa { color: #15803d; font-weight: bold; }
+  .analogia { background: #ede9fe; border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 10.5pt; break-inside: avoid; }
+  .fontes { margin: 0; padding-left: 18px; font-size: 10pt; }
+  .fontes a { color: #6d28d9; text-decoration: none; }
+  .fontes .url { color: #6b7280; font-size: 8pt; word-break: break-all; }
   .rodape { text-align: center; font-size: 8pt; color: #6b7280; margin-top: 14px; }
 </style>
 </head>
@@ -45,7 +49,8 @@
 <div class="card branco">{{ c.abertura | paragrafos }}</div>
 
 {% for s in c.secoes %}
-<div class="card branco roxo"><h2>{{ s.emoji }} {{ s.titulo }}</h2>{{ s.texto | paragrafos }}</div>
+<div class="card branco roxo"><h2>{{ s.emoji }} {{ s.titulo }}</h2>{{ s.texto | paragrafos }}
+  {% if s.analogia %}<div class="analogia">💡 <b>Pensa assim:</b> {{ s.analogia | inline }}</div>{% endif %}</div>
 {% endfor %}
 
 <div class="card amarelo"><h2>🎯 5 ideias para levar</h2>
@@ -54,6 +59,10 @@
 <div class="card azul"><h2>🇺🇸 Inglês técnico do dia</h2>
   {% for t in c.ingles %}<p><b>{{ t.termo }}</b> — {{ t.traducao }}<br>{{ t.explicacao | inline }}<br><i>“{{ t.exemplo }}”</i></p>{% endfor %}</div>
 <div class="card rosa"><h2>🤯 Curiosidade</h2>{{ c.curiosidade | paragrafos }}</div>
+{% if p.fontes_web %}
+<div class="card branco roxo"><h2>🔗 Para ir além</h2>
+  <ul class="fontes">{% for f in p.fontes_web %}<li><a href="{{ f.url }}">{{ f.titulo }}</a><br><span class="url">{{ f.url }}</span></li>{% endfor %}</ul></div>
+{% endif %}
 
 {# ---------- Questões ---------- #}
 <div class="quebra"></div>
@@ -96,6 +105,6 @@
 {% endfor %}
 </div>
 
-<div class="rodape">Capítulos: {{ p.capitulos | join(" · ") }}<br>Explicações originais geradas por IA a partir do livro.</div>
+<div class="rodape">Capítulos: {{ p.capitulos | join(" · ") }}<br>Explicações originais geradas por IA a partir do livro e de pesquisa na web.</div>
 </body>
 </html>
