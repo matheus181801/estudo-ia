@@ -21,6 +21,9 @@ def main() -> None:
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
+    podcast = sub.add_parser("podcast", help="gera o podcast de um pacote já gerado")
+    podcast.add_argument("--pasta", default="data/pacotes/teste", help="pasta do pacote (com pacote.json)")
+    podcast.add_argument("--fallback", action="store_true", help="pula o NotebookLM e usa o Gemini TTS")
     pacote = sub.add_parser("pacote", help="gera o pacote da próxima sessão")
     pacote.add_argument("--teste", action="store_true", help="gera em data/pacotes/teste sem registrar no banco")
     args = parser.parse_args()
@@ -79,6 +82,19 @@ def main() -> None:
         print(f"Pacote pronto: {arquivos.titulo}")
         print(f"  HTML: {arquivos.html}")
         print(f"  PDF:  {arquivos.pdf}")
+
+    elif args.comando == "podcast":
+        from pathlib import Path
+
+        from estudo_ia.pacote.gerador import carregar_pacote
+        from estudo_ia.podcast.servico import gerar_podcast
+
+        pasta = Path(args.pasta)
+        resultado = gerar_podcast(carregar_pacote(pasta / "pacote.json"), pasta, config,
+                                  forcar_fallback=args.fallback)
+        for aviso in resultado.avisos:
+            print(f"! {aviso}")
+        print(f"Podcast pronto ({resultado.origem}, {resultado.minutos} min): {resultado.mp3}")
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar
