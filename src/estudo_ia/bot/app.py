@@ -193,7 +193,10 @@ def criar_app(config: Config, engine) -> Application:
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 arquivo = Path(tmp) / original.document.file_name
-                await (await original.document.get_file()).download_to_drive(arquivo)
+                # Tempos maiores: por padrão a biblioteca espera só 5 s, pouco para 4–5 MB.
+                tempos = {"read_timeout": 120, "connect_timeout": 30}
+                arquivo_tg = await original.document.get_file(**tempos)
+                await arquivo_tg.download_to_drive(arquivo, **tempos)
                 backup = await asyncio.to_thread(instalar_banco, arquivo, config.caminho_banco)
             engine.dispose()  # descarta conexões abertas no banco antigo
         except Exception as erro:
