@@ -135,6 +135,20 @@ def situacao_atual(engine) -> Situacao | None:
         return situacao
 
 
+def progresso_por_livro(engine) -> tuple[int | None, dict[int, tuple[int, int]]]:
+    """Devolve (id do livro ativo, {livro_id: (sessões concluídas, total)}).
+
+    Só aparecem no dicionário os livros que já tiveram trilha criada.
+    """
+    with abrir_sessao(engine) as s:
+        ativo = s.exec(select(Progresso.livro_id).where(Progresso.ativo == True)).first()  # noqa: E712
+        progresso = {}
+        for sessao in s.exec(select(Sessao)).all():
+            feitas, total = progresso.get(sessao.livro_id, (0, 0))
+            progresso[sessao.livro_id] = (feitas + (sessao.status != "pendente"), total + 1)
+    return ativo, progresso
+
+
 def pular_proxima(engine) -> bool:
     """Marca a próxima sessão como pulada. Devolve False se não havia sessão."""
     with abrir_sessao(engine) as s:

@@ -100,3 +100,38 @@ def test_documentos_do_claude_tem_cache_no_fim():
     assert [d["title"] for d in docs] == ["Cap. 1: Cap 1", "Cap. 2: Cap 2"]
     assert "cache_control" in docs[-1] and "cache_control" not in docs[0]
     assert all("citations" not in d for d in docs)  # citações desligadas (direitos autorais)
+
+
+def test_rotulo_do_botao_de_livro():
+    from estudo_ia.bot.teclados import rotulo_livro
+
+    assert rotulo_livro("Inspired", ativo=False, progresso=None) == "Inspired"
+    assert rotulo_livro("Inspired", ativo=True, progresso=(2, 7)) == "▶️ Inspired · 2/7"
+    assert rotulo_livro("Inspired", ativo=False, progresso=(7, 7)) == "Inspired · ✅"
+    longo = rotulo_livro("x" * 80, ativo=False, progresso=None)
+    assert len(longo) == 48 and longo.endswith("…")
+
+
+def test_teclado_marca_livro_ativo_e_progresso(tmp_path):
+    from estudo_ia.bot.teclados import teclado_livros
+
+    engine = criar_engine(tmp_path / "t.db")
+    livro_id = criar_livro(engine)
+    botoes = [linha[0] for linha in teclado_livros(engine).inline_keyboard]
+    assert [b.text for b in botoes] == ["Cointeligência"]  # sem trilha ainda
+    assert botoes[0].callback_data == f"livro:{livro_id}"
+
+    planejador.escolher_livro(engine, livro_id)
+    planejador.pular_proxima(engine)
+    botoes = [linha[0] for linha in teclado_livros(engine).inline_keyboard]
+    assert botoes[0].text == "▶️ Cointeligência · 1/2"
+
+
+def test_texto_da_proxima_sessao(tmp_path):
+    from estudo_ia.bot.app import texto_proxima_sessao
+
+    assert "Escolha com /livros" in texto_proxima_sessao(None)
+    engine = criar_engine(tmp_path / "t.db")
+    planejador.escolher_livro(engine, criar_livro(engine))
+    texto = texto_proxima_sessao(planejador.situacao_atual(engine))
+    assert "Próxima sessão (1 de 2)" in texto and "Páginas 1–20" in texto

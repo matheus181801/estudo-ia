@@ -16,13 +16,16 @@ from pathlib import Path
 from sqlmodel import select
 from telegram import Update
 from telegram.constants import ChatAction, ParseMode
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler, ContextTypes,
+                          MessageHandler, filters)
 
 from estudo_ia.bot import roteador
 from estudo_ia.bot.banco import instalar_banco
 from estudo_ia.bot.formatacao import dividir, markdown_para_html, normalizar
+from estudo_ia.bot.teclados import teclado_comecar, teclado_livros
 from estudo_ia.config import Config
 from estudo_ia.db import Livro, abrir_sessao
+from estudo_ia.entrega import pipeline
 from estudo_ia.ingestao import file_search
 from estudo_ia.ingestao.biblioteca import listar_livros
 from estudo_ia.leitura import claude_livro
@@ -38,8 +41,7 @@ Perguntas sobre o livro da trilha são respondidas pelo Claude, que lê o livro 
 Para buscar em toda a biblioteca, use /geral ou fale em "outros livros".
 
 /geral &lt;pergunta&gt; — pergunta sobre toda a biblioteca
-/livros — lista os livros da biblioteca
-/livro &lt;número ou nome&gt; — escolhe o livro da trilha
+/livros — mostra os livros como botões para você escolher o que estudar
 /status — em que ponto da trilha você está
 /proximo — o que vem na próxima sessão
 /pular — pula a próxima sessão
@@ -54,6 +56,20 @@ async def responder(update: Update, texto_markdown: str) -> None:
         except Exception:
             # Se a formatação der problema, manda como texto puro.
             await update.message.reply_text(parte)
+
+
+def texto_proxima_sessao(sit) -> str:
+    """Descrição da próxima sessão (capítulos e páginas), em Markdown."""
+    if sit is None:
+        return "Nenhum livro na trilha ainda. Escolha com /livros"
+    if sit.proxima is None:
+        return "🎉 Você terminou este livro! Escolha outro com /livros"
+    s = sit.proxima
+    caps = sit.titulo_cap_inicio if sit.titulo_cap_inicio == sit.titulo_cap_fim \
+        else f"{sit.titulo_cap_inicio}\naté {sit.titulo_cap_fim}"
+    paginas_aprox = round(s.caracteres / 2000)
+    return (f"**Próxima sessão ({s.ordem} de {sit.total})**\n{caps}\n\n"
+            f"Páginas {s.pagina_inicio}–{s.pagina_fim} do arquivo · ~{paginas_aprox} páginas de leitura")
 
 
 def encontrar_livro(engine, busca: str) -> list[Livro]:
@@ -80,13 +96,10 @@ def criar_app(config: Config, engine) -> Application:
 
     async def cmd_ajuda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(AJUDA, parse_mode=ParseMode.HTML)
+        await enviar_lista_livros(update.message)
 
     async def cmd_livros(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        linhas = ["**Biblioteca**", ""]
-        for livro, capitulos, _ in listar_livros(engine):
-            linhas.append(f"{livro.id}. {livro.titulo} ({capitulos} cap.)")
-        linhas += ["", "Para escolher: /livro 16 ou /livro inspired"]
-        await responder(update, "\n".join(linhas))
+        await enviar_lista_livros(update.message)
 
     async def cmd_livro(update: Update, context: ContextTypes.DEFAULT_TYPE):
         busca = " ".join(context.args)
@@ -114,21 +127,61 @@ def criar_app(config: Config, engine) -> Application:
         await responder(update, f"📖 **{sit.livro.titulo}**\n{barra} {porcentagem}%\nSessões: {sit.concluidas} de {sit.total}")
 
     async def cmd_proximo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        sit = planejador.situacao_atual(engine)
-        if sit is None:
-            await update.message.reply_text("Nenhum livro na trilha ainda. Escolha com /livro")
+        await responder(update, texto_proxima_sessao(planejador.situacao_atual(engine)))
+
+    # ---------- Escolha do livro por botões ----------
+
+    async def enviar_lista_livros(mensagem):
+        await mensagem.reply_text("📚 Escolha o livro que você quer estudar:",
+                                  reply_markup=teclado_livros(engine))
+
+    gerando = asyncio.Lock()  # evita gerar dois pacotes ao mesmo tempo (toque duplo no botão)
+
+    def gerar_e_entregar() -> bool:
+        pacote_id = pipeline.gerar(engine, config, avisar=log.info)
+        return pacote_id is not None and pipeline.entregar(engine, config, pacote_id, avisar=log.info)
+
+    async def ao_tocar_botao(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        consulta = update.callback_query
+        if consulta.message.chat.id != int(config.telegram_chat_id):
+            await consulta.answer()  # botão tocado fora do chat do Matheus: ignora
             return
-        if sit.proxima is None:
-            await update.message.reply_text("🎉 Você terminou este livro! Escolha outro com /livro")
-            return
-        s = sit.proxima
-        caps = sit.titulo_cap_inicio if sit.titulo_cap_inicio == sit.titulo_cap_fim \
-            else f"{sit.titulo_cap_inicio}\naté {sit.titulo_cap_fim}"
-        paginas_aprox = round(s.caracteres / 2000)
-        await responder(update, (
-            f"**Próxima sessão ({s.ordem} de {sit.total})**\n{caps}\n\n"
-            f"Páginas {s.pagina_inicio}–{s.pagina_fim} do arquivo · ~{paginas_aprox} páginas de leitura"
-        ))
+        await consulta.answer()  # tira o "carregando" do botão no celular
+
+        if consulta.data.startswith("livro:"):
+            livro, total = planejador.escolher_livro(engine, int(consulta.data.split(":")[1]))
+            texto = (f"✅ Trilha definida: **{livro.titulo}**\n{total} sessões de ~90 minutos.\n\n"
+                     + texto_proxima_sessao(planejador.situacao_atual(engine))
+                     + "\n\nQuer receber o pacote desta sessão agora?")
+            await consulta.edit_message_text(markdown_para_html(texto), parse_mode=ParseMode.HTML,
+                                             reply_markup=teclado_comecar())
+
+        elif consulta.data == "amanha":
+            await consulta.edit_message_reply_markup(reply_markup=None)
+            await consulta.message.reply_text(f"⏰ Combinado! O pacote chega amanhã às {config.hora_entrega}.")
+
+        elif consulta.data == "comecar":
+            await consulta.edit_message_reply_markup(reply_markup=None)
+            if gerando.locked():
+                await consulta.message.reply_text("⏳ Já estou gerando um pacote, só um instante.")
+                return
+            # Roda em segundo plano: o bot continua respondendo perguntas enquanto isso.
+            context.application.create_task(gerar_em_segundo_plano(consulta.message))
+
+    async def gerar_em_segundo_plano(mensagem):
+        async with gerando:
+            await mensagem.reply_text(
+                "🚀 Gerando o pacote completo: newsletter, questões, podcast e vídeo.\n"
+                "Leva uns 20 a 30 minutos; os arquivos chegam aqui e no e-mail. "
+                "Enquanto isso, pode continuar perguntando.")
+            try:
+                ok = await asyncio.to_thread(gerar_e_entregar)
+            except Exception:
+                log.exception("Erro ao gerar o pacote pelo botão")
+                ok = False
+            if not ok:
+                await mensagem.reply_text("😕 Não consegui entregar o pacote agora. "
+                                          "Veja os alertas acima; tento de novo às 04:00.")
 
     async def cmd_pular(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if planejador.pular_proxima(engine):
@@ -228,6 +281,7 @@ def criar_app(config: Config, engine) -> Application:
     app.add_handler(CommandHandler("pacote", cmd_pacote, filters=so_matheus))
     app.add_handler(CommandHandler("geral", cmd_geral, filters=so_matheus))
     app.add_handler(CommandHandler("importar", cmd_importar, filters=so_matheus))
+    app.add_handler(CallbackQueryHandler(ao_tocar_botao))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & so_matheus, pergunta))
     return app
 
