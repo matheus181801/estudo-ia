@@ -22,6 +22,7 @@ def main() -> None:
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
     sub.add_parser("servico", help="bot + agendador (o que roda na VPS)")
+    sub.add_parser("bot-mba", help="liga só o bot do MBA (grupo com tópicos)")
     sub.add_parser("enviar-banco", help="manda o banco compactado no Telegram (para /importar na VPS)")
     mba = sub.add_parser("mba", help="aulas do MBA: busca no Drive, processa e entrega")
     mba.add_argument("--entregar-ja", action="store_true", help="entrega as prontas agora (sem esperar 06:30)")
@@ -128,6 +129,16 @@ def main() -> None:
         if not args.so_gerar:
             ok = pipeline.entregar(engine, config, pacote_id)
             print("Entregue!" if ok else "A entrega falhou (veja os alertas).")
+
+    elif args.comando == "bot-mba":
+        import logging
+
+        from estudo_ia.mba.bot_mba import criar_app_mba
+
+        logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
+        logging.getLogger("httpx").setLevel(logging.WARNING)  # a URL do Telegram contém o token
+        print("Bot do MBA rodando. Aperte Ctrl+C para parar.")
+        criar_app_mba(config, engine).run_polling()
 
     elif args.comando == "servico":
         from estudo_ia.agendador import rodar_servico
