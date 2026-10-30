@@ -7,8 +7,8 @@
  *
  * Segurança:
  *   - todo pedido precisa da chave secreta (propriedade CHAVE do script);
- *   - leitura só de arquivos dentro de "Aulas"; escrita só dentro de
- *     "Aprofundamento das Aulas". Nenhuma outra pasta do Drive é tocada.
+ *   - leitura só dentro de "Aulas" e de "Aprofundamento das Aulas"; escrita
+ *     só dentro de "Aprofundamento das Aulas". Nenhuma outra pasta é tocada.
  *
  * Como publicar: Implantar → Nova implantação → App da Web →
  *   Executar como: Eu · Quem pode acessar: Qualquer pessoa.
@@ -27,18 +27,42 @@ function conferirChave_(chave) {
   if (!certa || chave !== certa) throw new Error('chave inválida');
 }
 
-/** Confere se o arquivo está dentro da pasta "Aulas" (em qualquer subpasta). */
-function estaDentroDeAulas_(arquivo) {
+/** Confere se o arquivo está dentro de "Aulas" ou de "Aprofundamento das Aulas". */
+function estaDentroDasPastas_(arquivo) {
+  const permitidas = [PASTA_AULAS, PASTA_APROFUNDAMENTO];
   const visitar = [arquivo.getParents()];
   for (let passos = 0; visitar.length && passos < 10; passos++) {
     const pais = visitar.shift();
     while (pais.hasNext()) {
       const pai = pais.next();
-      if (pai.getId() === PASTA_AULAS) return true;
+      if (permitidas.indexOf(pai.getId()) >= 0) return true;
       visitar.push(pai.getParents());
     }
   }
   return false;
+}
+
+/** Lista "Aprofundamento das Aulas": matérias → aulas → arquivos (o que já foi processado). */
+function listarProcessadas_() {
+  const materias = [];
+  const pastasMateria = DriveApp.getFolderById(PASTA_APROFUNDAMENTO).getFolders();
+  while (pastasMateria.hasNext()) {
+    const m = pastasMateria.next();
+    const aulas = [];
+    const pastasAula = m.getFolders();
+    while (pastasAula.hasNext()) {
+      const a = pastasAula.next();
+      const arquivos = [];
+      const itens = a.getFiles();
+      while (itens.hasNext()) {
+        const f = itens.next();
+        arquivos.push({ id: f.getId(), nome: f.getName(), tipo: f.getMimeType(), tamanho: f.getSize() });
+      }
+      aulas.push({ id: a.getId(), nome: a.getName(), criada: a.getDateCreated().toISOString(), arquivos: arquivos });
+    }
+    materias.push({ nome: m.getName(), aulas: aulas });
+  }
+  return materias;
 }
 
 function listarAulas_() {
@@ -59,7 +83,7 @@ function listarAulas_() {
 
 function baixar_(id) {
   const arquivo = DriveApp.getFileById(id);
-  if (!estaDentroDeAulas_(arquivo)) throw new Error('arquivo fora da pasta Aulas');
+  if (!estaDentroDasPastas_(arquivo)) throw new Error('arquivo fora das pastas permitidas');
   return {
     nome: arquivo.getName(),
     tipo: arquivo.getMimeType(),
@@ -88,6 +112,7 @@ function doGet(e) {
   try {
     conferirChave_(e.parameter.chave);
     if (e.parameter.acao === 'listar') return responder_({ ok: true, aulas: listarAulas_() });
+    if (e.parameter.acao === 'processadas') return responder_({ ok: true, materias: listarProcessadas_() });
     if (e.parameter.acao === 'baixar') return responder_({ ok: true, arquivo: baixar_(e.parameter.id) });
     if (e.parameter.acao === 'ping') return responder_({ ok: true });
     throw new Error('ação desconhecida');

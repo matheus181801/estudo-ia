@@ -31,14 +31,19 @@ log = logging.getLogger(__name__)
 PEDIDO_ROTEIRO = """Escreva o roteiro de um podcast em português do Brasil com dois apresentadores,
 Ana e Leo, conversando sobre o material de estudo abaixo. O ouvinte é o Matheus, que faz um MBA
 em AI Leadership. Regras:
-- Entre 3.000 e 3.400 palavras no total (cerca de 20 minutos falados). É um episódio longo:
-  aprofunde cada conceito com exemplos, perguntas e casos antes de passar ao próximo.
+- {tamanho}
 - Conversa natural e divertida: perguntas, analogias do dia a dia, pequenas brincadeiras,
   um apresentador desafiando o outro. Nada de leitura de apostila.
 - Falas curtas (no máximo 80 palavras cada), alternando bastante entre os dois.
 - Comece com "Bem-vindos ao Estudo IA" e termine com um resumo das ideias principais.
 - Explique com palavras originais; não invente dados que não estão no material.
 - Escreva números e siglas como devem ser falados (ex.: "dois mil e vinte e quatro", "R L H F")."""
+
+
+TAMANHO_LIVRO = """Entre 3.000 e 3.400 palavras no total (cerca de 20 minutos falados). É um episódio longo:
+  aprofunde cada conceito com exemplos, perguntas e casos antes de passar ao próximo."""
+TAMANHO_AULA = """Entre 1.300 e 1.600 palavras no total (cerca de 10 minutos falados). É um complemento
+  CURTO e objetivo de uma aula: revise os conceitos principais e explique do zero os termos técnicos."""
 
 
 class Fala(BaseModel):
@@ -57,7 +62,8 @@ def escrever_roteiro(cliente: anthropic.Anthropic, config: Config, pacote: Pacot
         max_tokens=64000,
         messages=[{
             "role": "user",
-            "content": f"{PEDIDO_ROTEIRO}\n\n# Material de estudo\n\n{pacote.midia.fonte_podcast}",
+            "content": PEDIDO_ROTEIRO.format(tamanho=TAMANHO_AULA if pacote.tipo == "aula" else TAMANHO_LIVRO)
+                       + f"\n\n# Material de estudo\n\n{pacote.midia.fonte_podcast}",
         }],
         output_format=RoteiroPodcast,
     ) as stream:

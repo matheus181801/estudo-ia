@@ -19,6 +19,9 @@ CAMPOS_SECRETOS = {
     "gemini_api_key",
     "telegram_bot_token",
     "gmail_senha_de_app",
+    "telegram_bot_token_mba",
+    "drive_ponte_url",
+    "drive_ponte_chave",
 }
 
 
@@ -53,6 +56,13 @@ class Config:
     podcast_max_min: int = 25
     notebooklm_perfil: str = "estudo"  # perfil de login do notebooklm-py
     video_max_min: int = 15
+
+    # MBA (aulas do Google Drive).
+    telegram_bot_token_mba: str = field(default="", repr=False)
+    telegram_grupo_mba_id: str = ""
+    drive_ponte_url: str = field(default="", repr=False)
+    drive_ponte_chave: str = field(default="", repr=False)
+    hora_entrega_mba: str = "06:30"
 
     # Pastas.
     data_dir: Path = Path("./data")
@@ -121,6 +131,11 @@ def carregar_config(arquivo_env: str | Path | None = ".env") -> Config:
         podcast_max_min=int(ler("PODCAST_MAX_MIN", "25")),
         notebooklm_perfil=ler("NOTEBOOKLM_PERFIL", "estudo"),
         video_max_min=int(ler("VIDEO_MAX_MIN", "15")),
+        telegram_bot_token_mba=ler("TELEGRAM_BOT_TOKEN_MBA"),
+        telegram_grupo_mba_id=ler("TELEGRAM_GRUPO_MBA_ID"),
+        drive_ponte_url=ler("DRIVE_PONTE_URL"),
+        drive_ponte_chave=ler("DRIVE_PONTE_CHAVE"),
+        hora_entrega_mba=ler("HORA_ENTREGA_MBA", "06:30"),
         data_dir=Path(ler("DATA_DIR", "./data")),
         biblioteca_dir=Path(ler("BIBLIOTECA_DIR", "./biblioteca")),
     )

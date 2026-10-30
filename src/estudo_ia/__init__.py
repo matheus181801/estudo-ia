@@ -23,6 +23,9 @@ def main() -> None:
     sub.add_parser("bot", help="liga o bot do Telegram")
     sub.add_parser("servico", help="bot + agendador (o que roda na VPS)")
     sub.add_parser("enviar-banco", help="manda o banco compactado no Telegram (para /importar na VPS)")
+    mba = sub.add_parser("mba", help="aulas do MBA: busca no Drive, processa e entrega")
+    mba.add_argument("--entregar-ja", action="store_true", help="entrega as prontas agora (sem esperar 06:30)")
+    mba.add_argument("--so-listar", action="store_true", help="só mostra as aulas encontradas")
     diario = sub.add_parser("diario", help="gera o pacote completo da próxima sessão e entrega")
     diario.add_argument("--so-gerar", action="store_true", help="só gera (texto, podcast e vídeo)")
     diario.add_argument("--so-entregar", action="store_true", help="só entrega o pacote já gerado")
@@ -136,6 +139,16 @@ def main() -> None:
 
         enviar_banco(config)
         print("Banco enviado no Telegram. Na VPS, responda a essa mensagem com /importar.")
+
+    elif args.comando == "mba":
+        from estudo_ia.mba import processador
+
+        if args.so_listar:
+            processador.sincronizar(engine, config, processador.criar_ponte(config))
+            processador.Progresso(config).atualizar(engine)
+            print(f"Progresso em {config.data_dir / 'mba' / 'progresso.json'}")
+        else:
+            processador.ciclo(engine, config, entregar_ja=args.entregar_ja)
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar

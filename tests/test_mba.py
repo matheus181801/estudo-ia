@@ -83,3 +83,68 @@ def test_template_do_livro_nao_muda():
     html = renderizar_html(pacote_falso(), "email.html.j2")
     assert "Sessão 2 de 7" in html
     assert "Glossário para iniciantes" not in html and "Avisos da aula" not in html
+
+
+# ---------------------------------------------------------------- processador
+
+from datetime import datetime  # noqa: E402
+
+from estudo_ia.config import Config  # noqa: E402
+from estudo_ia.db import AulaMBA, Materia, abrir_sessao, criar_engine  # noqa: E402
+from estudo_ia.mba import processador  # noqa: E402
+from estudo_ia.mba.drive import PastaAula  # noqa: E402
+from sqlmodel import select  # noqa: E402
+
+
+def test_entrega_as_6h30_do_dia_seguinte():
+    aula = AulaMBA(pasta_id="x", titulo="t", data=date(2026, 10, 29), materia_id=1)
+    config = Config(hora_entrega_mba="06:30")
+    assert not processador.hora_de_entregar(aula, config, datetime(2026, 10, 29, 23, 0))
+    assert not processador.hora_de_entregar(aula, config, datetime(2026, 10, 30, 6, 29))
+    assert processador.hora_de_entregar(aula, config, datetime(2026, 10, 30, 6, 30))
+
+
+def test_retoma_pela_ultima_etapa_com_arquivo(tmp_path):
+    assert processador.etapa_pelos_arquivos(tmp_path) == "nova"
+    (tmp_path / "notas.json").write_text("{}")
+    assert processador.etapa_pelos_arquivos(tmp_path) == "notas"
+    (tmp_path / "pacote.pdf").write_bytes(b"%PDF")
+    assert processador.etapa_pelos_arquivos(tmp_path) == "pacote"
+
+
+def test_slug_sem_acentos():
+    assert processador.slug("22.10.2026 - Estratégia de IA") == "22.10.2026-Estrategia-de-IA"
+
+
+class PonteFalsa:
+    """Imita a Ponte Drive: uma aula nova e uma já processada (com notas e estado no Drive)."""
+
+    def __init__(self):
+        self.arquivos = {"n1": b'{"titulo_aula": "x"}', "e1": b'{"entregue": true, "topico_id": 42, "professor": "Igor"}'}
+
+    def listar_aulas(self):
+        return [PastaAula(id="p1", nome="22.10.2026 - Estratégia de IA", criada=""),
+                PastaAula(id="p2", nome="29.10.2026 - Estratégia de IA", criada=""),
+                PastaAula(id="p3", nome="13.10.26 - Pré Aula - Algo", criada="")]
+
+    def listar_processadas(self):
+        feita = PastaAula(id="d1", nome="22.10.2026 - Estratégia de IA", criada="", arquivos=[
+            ArquivoDrive(id="n1", nome="notas.json", tipo="", tamanho=1),
+            ArquivoDrive(id="e1", nome="estado.json", tipo="", tamanho=1)])
+        return {"Estratégia de IA": [feita]}
+
+    def baixar(self, arquivo_id):
+        return self.arquivos[arquivo_id]
+
+
+def test_sincronizar_importa_processadas_e_registra_novas(tmp_path):
+    engine = criar_engine(tmp_path / "t.db")
+    novas = processador.sincronizar(engine, Config(data_dir=tmp_path), PonteFalsa(), avisar=lambda *_: None)
+    assert novas == ["29.10.2026 - Estratégia de IA"]  # a Pré Aula é ignorada
+    with abrir_sessao(engine) as s:
+        etapas = {a.titulo: a.etapa for a in s.exec(select(AulaMBA)).all()}
+        materia = s.exec(select(Materia)).one()
+    assert etapas == {"22.10.2026 - Estratégia de IA": "entregue", "29.10.2026 - Estratégia de IA": "nova"}
+    assert materia.topico_id == 42  # tópico recuperado do Drive: não cria tópico duplicado
+    # Rodar de novo não duplica nada.
+    assert processador.sincronizar(engine, Config(data_dir=tmp_path), PonteFalsa(), avisar=lambda *_: None) == []

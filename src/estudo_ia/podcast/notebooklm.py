@@ -25,13 +25,21 @@ e está em transição de carreira para tecnologia. Tom descontraído, divertido
 com analogias do dia a dia. Explique os conceitos e dê exemplos práticos de uso no trabalho.
 Duração ideal: cerca de 20 minutos."""
 
+# Aulas do MBA: o podcast é um complemento da aula, então curto e objetivo.
+INSTRUCOES_AULA = """Podcast CURTO e objetivo em português do Brasil para o Matheus, que faz um MBA em
+AI Leadership e não é da área de tecnologia. É um complemento da aula, não uma aula nova:
+revise os conceitos principais, explique do zero os termos técnicos e dê exemplos práticos.
+Tom descontraído e didático. Duração ideal: de 8 a 10 minutos."""
+
 
 def _material(pacote: Pacote) -> str:
     """Fonte do podcast: só material original (notas de estudo e newsletter)."""
     c = pacote.conteudo
     secoes = "\n\n".join(f"## {s.titulo}\n{s.texto}\nAnalogia: {s.analogia}" for s in c.secoes)
+    referencia = (f"Aula de {pacote.livro} (Prof. {pacote.autor})" if pacote.tipo == "aula"
+                  else f"Livro de referência: {pacote.livro}, de {pacote.autor}")
     return (
-        f"# {c.titulo}\nLivro de referência: {pacote.livro}, de {pacote.autor}\n\n"
+        f"# {c.titulo}\n{referencia}\n\n"
         f"{pacote.midia.fonte_podcast}\n\n# Resumo da newsletter\n{secoes}\n\n"
         f"Na prática: {c.na_pratica}\nCuriosidade: {c.curiosidade}"
     )
@@ -45,12 +53,13 @@ async def _gerar(pacote: Pacote, destino: Path, limite_min: float, perfil: str) 
         caderno = await cliente.notebooks.create(f"Estudo IA — {date.today().isoformat()}")
         try:
             await cliente.sources.add_text(caderno.id, pacote.conteudo.titulo, _material(pacote), wait=True)
+            aula = pacote.tipo == "aula"
             status = await cliente.artifacts.generate_audio(
                 caderno.id,
                 language="pt-BR",
-                instructions=INSTRUCOES,
+                instructions=INSTRUCOES_AULA if aula else INSTRUCOES,
                 audio_format=AudioFormat.DEEP_DIVE,
-                audio_length=AudioLength.DEFAULT,
+                audio_length=AudioLength.SHORT if aula else AudioLength.DEFAULT,
             )
             # A geração costuma levar de 5 a 15 minutos.
             await cliente.artifacts.wait_for_completion(

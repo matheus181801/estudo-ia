@@ -58,6 +58,15 @@ class PonteDrive:
             for a in self._get(acao="listar")["aulas"]
         ]
 
+    def listar_processadas(self) -> dict[str, list[PastaAula]]:
+        """O que já existe em "Aprofundamento das Aulas": {matéria: [pastas de aula]}."""
+        return {
+            m["nome"]: [PastaAula(id=a["id"], nome=a["nome"], criada=a["criada"],
+                                  arquivos=[ArquivoDrive(**arq) for arq in a["arquivos"]])
+                        for a in m["aulas"]]
+            for m in self._get(acao="processadas")["materias"]
+        }
+
     def baixar(self, arquivo_id: str) -> bytes:
         return base64.b64decode(self._get(acao="baixar", id=arquivo_id)["arquivo"]["base64"])
 
