@@ -40,6 +40,14 @@ def test_le_o_arquivo_env(tmp_path):
     assert config.anthropic_api_key == "chave-falsa-de-teste"
 
 
+def test_senha_com_cerquilha_nao_e_cortada(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("GMAIL_SENHA_DE_APP=abc#123\nPROVEDOR_TEXTO=gemini # comentário\n", encoding="utf-8")
+    config = carregar_config(env)
+    assert config.gmail_senha_de_app == "abc#123"
+    assert config.provedor_texto == "gemini"
+
+
 def test_valores_padrao_sem_env(tmp_path):
     config = carregar_config(tmp_path / "nao-existe.env")
     assert config.provedor_texto == "claude"

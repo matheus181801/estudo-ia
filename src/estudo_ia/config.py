@@ -7,6 +7,7 @@ nenhum segredo fica escrito no código ou no git.
 """
 
 import os
+import re
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
@@ -75,8 +76,12 @@ class Config:
 
 
 def _limpa(valor: str) -> str:
-    """Remove comentários no fim da linha (ex.: 'claude   # claude ou gemini')."""
-    return valor.split("#", 1)[0].strip()
+    """Remove comentários no fim da linha (ex.: 'claude   # claude ou gemini').
+
+    Só conta como comentário um '#' com espaço antes: assim uma senha que
+    contém '#' (ex.: 'abc#123') não é cortada.
+    """
+    return re.split(r"\s+#", valor, maxsplit=1)[0].strip()
 
 
 def carregar_config(arquivo_env: str | Path | None = ".env") -> Config:
