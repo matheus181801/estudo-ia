@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from estudo_ia.config import Config
-from estudo_ia.ingestao.file_search import criar_cliente as criar_cliente_gemini
 from estudo_ia.leitura.claude_livro import criar_cliente as criar_cliente_claude
 from estudo_ia.pacote.modelos import Pacote
 from estudo_ia.podcast.audio import duracao_minutos, para_mp3
@@ -53,10 +52,10 @@ def gerar_podcast(pacote: Pacote, pasta: Path, config: Config, forcar_fallback: 
             avisos.append(f"NotebookLM falhou ({type(erro).__name__}: {str(erro)[:150]}). "
                           "A sessão do login pode ter expirado.")
 
-    from estudo_ia.podcast.tts import gerar_audio_tts
+    from estudo_ia.podcast.tts import criar_cliente_tts, gerar_audio_tts
 
     gerar_audio_tts(criar_cliente_claude(config).with_options(timeout=600.0),
-                    criar_cliente_gemini(config), config, pacote, mp3, avisar=avisar)
+                    criar_cliente_tts(config), config, pacote, mp3, avisar=avisar)
     minutos = duracao_minutos(mp3)
     if minutos > config.podcast_max_min:
         avisos.append(f"Mesmo o podcast do Gemini TTS passou do limite ({minutos:.0f} min).")

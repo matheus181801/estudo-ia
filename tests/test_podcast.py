@@ -64,7 +64,7 @@ def _dublar(monkeypatch, tmp_path, minutos_notebooklm=None, erro_notebooklm=None
     monkeypatch.setattr(servico, "duracao_minutos", lambda arq: duracoes[Path(arq).suffix.lstrip(".")])
     monkeypatch.setattr(servico, "para_mp3", lambda entrada, saida: shutil.copy(entrada, saida))
     monkeypatch.setattr(servico, "criar_cliente_claude", lambda c: type("C", (), {"with_options": lambda s, **k: s})())
-    monkeypatch.setattr(servico, "criar_cliente_gemini", lambda c: None)
+    monkeypatch.setattr(tts, "criar_cliente_tts", lambda c: None)
 
 
 def test_usa_notebooklm_quando_da_certo(monkeypatch, tmp_path):
@@ -85,3 +85,50 @@ def test_fallback_quando_notebooklm_falha(monkeypatch, tmp_path):
     r = servico.gerar_podcast(None, tmp_path, Config(), avisar=lambda *_: None)
     assert r.origem == servico.GEMINI_TTS
     assert "expirado" in r.avisos[0]
+
+
+def test_sintetizar_desiste_de_pedido_travado(monkeypatch, tmp_path):
+    import base64
+    import threading
+
+    from estudo_ia.podcast import tts
+
+    chamadas = []
+    liberar = threading.Event()
+
+    class InteracoesFalsas:
+        def create(self, **_):
+            chamadas.append(1)
+            if len(chamadas) == 1:
+                liberar.wait(5)  # 1º pedido "trava" (nunca responde a tempo)
+            return type("R", (), {"output_audio": type("A", (), {"data": base64.b64encode(b"RIFF").decode()})})()
+
+    cliente = type("C", (), {"interactions": InteracoesFalsas()})()
+    monkeypatch.setattr(tts, "LIMITE_POR_PEDIDO_S", 0.2)
+    monkeypatch.setattr(tts.time, "sleep", lambda s: None)  # não espera de verdade entre tentativas
+
+    destino = tts.sintetizar(cliente, Config(), [], {}, tmp_path / "fala.wav")
+    liberar.set()
+    assert len(chamadas) == 2  # desistiu do travado e tentou de novo
+    assert destino.read_bytes() == b"RIFF"
+
+
+def test_sintetizar_alterna_modelos_entre_tentativas(monkeypatch, tmp_path):
+    import base64
+
+    from estudo_ia.podcast import tts
+
+    modelos_usados = []
+
+    class InteracoesFalsas:
+        def create(self, model, **_):
+            modelos_usados.append(model)
+            if len(modelos_usados) < 3:
+                raise RuntimeError("servidor engasgou")
+            return type("R", (), {"output_audio": type("A", (), {"data": base64.b64encode(b"RIFF").decode()})})()
+
+    monkeypatch.setattr(tts.time, "sleep", lambda s: None)
+    config = Config(gemini_modelo_tts="voz-normal", gemini_modelo_tts_video="voz-lite")
+    tts.sintetizar(type("C", (), {"interactions": InteracoesFalsas()})(), config, [], {},
+                   tmp_path / "f.wav", modelo="voz-lite")
+    assert modelos_usados == ["voz-lite", "voz-normal", "voz-lite"]

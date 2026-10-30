@@ -54,3 +54,31 @@ def test_monta_mp4_720p_com_duracao_certa(tmp_path):
         capture_output=True, text=True, check=True).stdout.strip()
     assert largura_altura == "1280,720"
     assert video.stat().st_size < 200_000  # imagens paradas: arquivo bem pequeno
+
+
+def test_dividir_ao_meio_corta_no_fim_da_frase():
+    from estudo_ia.video.servico import dividir_ao_meio
+
+    a, b = dividir_ao_meio("Primeira frase. Segunda frase! Terceira? Quarta.")
+    assert a == "Primeira frase. Segunda frase!" and b == "Terceira? Quarta."
+    a, b = dividir_ao_meio("sem pontuação nenhuma aqui")
+    assert a == "sem pontuação" and b == "nenhuma aqui"
+
+
+def test_narrar_slide_divide_quando_trava(monkeypatch, tmp_path):
+    from estudo_ia.config import Config
+    from estudo_ia.video import servico
+
+    textos = []
+
+    def sintetizar_falso(cliente, config, conteudo, vozes, destino, modelo=None):
+        texto = conteudo[0]["text"]
+        textos.append(texto)
+        if texto == "Um. Dois.":  # o texto inteiro sempre trava
+            raise TimeoutError()
+        return criar_wav(destino, 1.0)
+
+    monkeypatch.setattr(servico, "sintetizar", sintetizar_falso)
+    destino = servico.narrar_slide(None, Config(), "Um. Dois.", tmp_path / "fala.wav")
+    assert textos == ["Um. Dois.", "Um.", "Dois."]
+    assert destino.exists() and not (tmp_path / "fala_a.wav").exists()

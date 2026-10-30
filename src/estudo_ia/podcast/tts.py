@@ -7,8 +7,10 @@
 """
 
 import base64
+import logging
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import anthropic
@@ -22,6 +24,9 @@ from estudo_ia.podcast.audio import juntar_wavs, para_mp3
 # Os nomes dos apresentadores e as vozes do Gemini (lista de vozes na documentação).
 APRESENTADORES = {"Ana": "Aoede", "Leo": "Puck"}  # Aoede: leve; Puck: animado
 PALAVRAS_POR_BLOCO = 300  # ~2 minutos de fala
+LIMITE_POR_PEDIDO_S = 60  # um pedido normal leva de 7 a 30 s; acima de 1 min consideramos travado
+
+log = logging.getLogger(__name__)
 
 PEDIDO_ROTEIRO = """Escreva o roteiro de um podcast em português do Brasil com dois apresentadores,
 Ana e Leo, conversando sobre o material de estudo abaixo. O ouvinte é o Matheus, que faz um MBA
@@ -78,28 +83,48 @@ def dividir_em_blocos(falas: list[Fala], limite: int = PALAVRAS_POR_BLOCO) -> li
     return blocos
 
 
+def criar_cliente_tts(config: Config) -> genai.Client:
+    """Cliente do Gemini só para voz: sem as retentativas automáticas da biblioteca,
+    porque as nossas (em `sintetizar`) já cuidam disso e duas camadas multiplicam a espera."""
+    return genai.Client(api_key=config.gemini_api_key)
+
+
 def sintetizar(cliente: genai.Client, config: Config, conteudo: list[dict], speech_config,
-               destino: Path) -> Path:
+               destino: Path, modelo: str | None = None) -> Path:
     """Um pedido ao Gemini TTS, salvo como WAV.
 
     Tenta de novo com espera crescente se der erro (no plano gratuito é comum
     bater no limite de pedidos por minuto). Usado pelo podcast e pelo vídeo.
     """
+    # Alternamos entre dois modelos de voz a cada tentativa: quando um deles
+    # "engasga" no mesmo pedido, o outro costuma responder normalmente.
+    modelos = [modelo or config.gemini_modelo_tts, config.gemini_modelo_tts_video]
+    if modelos[1] == modelos[0]:
+        modelos[1] = config.gemini_modelo_tts
     for tentativa in range(5):
+        # Tempo limite "duro": já vimos um pedido ficar preso para sempre sem
+        # resposta (o timeout da biblioteca não valeu). A chamada roda numa
+        # thread e, se passar do limite, desistimos dela e tentamos de novo.
+        executor = ThreadPoolExecutor(max_workers=1)
         try:
-            resposta = cliente.interactions.create(
-                model=config.gemini_modelo_tts,
+            futuro = executor.submit(
+                cliente.interactions.create,
+                model=modelos[tentativa % 2],
                 input=[{"type": "user_input", "content": conteudo}],
                 response_format={"type": "audio"},
                 generation_config={"speech_config": speech_config},
             )
+            resposta = futuro.result(timeout=LIMITE_POR_PEDIDO_S)
             # A resposta já vem como WAV completo (com cabeçalho), em base64.
             destino.write_bytes(base64.b64decode(resposta.output_audio.data))
             return destino
-        except Exception:
+        except Exception as erro:
+            log.warning("Gemini TTS falhou (tentativa %d de 5): %s", tentativa + 1, type(erro).__name__)
             if tentativa == 4:
                 raise
-            time.sleep(20 * (tentativa + 1))  # espera crescente: 20s, 40s, 60s...
+            time.sleep(10 * (tentativa + 1))  # espera crescente: 10s, 20s, 30s...
+        finally:
+            executor.shutdown(wait=False)  # não espera a thread presa terminar
     return destino
 
 
