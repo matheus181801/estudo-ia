@@ -397,6 +397,7 @@ dependencies = [
     { name = "pymupdf" },
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
+    { name = "requests" },
     { name = "sqlmodel" },
 ]
 
@@ -416,6 +417,7 @@ requires-dist = [
     { name = "pymupdf", specifier = ">=2.0" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "python-telegram-bot", specifier = ">=22.8" },
+    { name = "requests", specifier = ">=2.34.2" },
     { name = "sqlmodel", specifier = ">=0.0.48" },
 ]
 

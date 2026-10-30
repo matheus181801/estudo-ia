@@ -13,6 +13,7 @@ dependencies = [
     "pymupdf>=2.0",
     "python-dotenv>=1.2.4",
     "python-telegram-bot>=22.8",
+    "requests>=2.34.2",
     "sqlmodel>=0.0.48",
 ]
 

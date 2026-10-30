@@ -8,3 +8,5 @@ __pycache__/
 *.mp4
 .pytest_cache/
 *.db
+credenciais_google*.json
+token_google*.json
