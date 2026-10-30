@@ -374,7 +374,10 @@ def ciclo(engine, config: Config, entregar_ja: bool = False, avisar=print) -> No
                            .order_by(AulaMBA.data)).all()
     for aula in pendentes:
         try:
-            processar_aula(engine, config, ponte, aula.id, progresso, avisar=avisar)
+            pronta = processar_aula(engine, config, ponte, aula.id, progresso, avisar=avisar)
+            # Entrega na hora (sem esperar as outras) quando já passou das 06:30 do dia seguinte.
+            if pronta.etapa == "pronta" and (entregar_ja or hora_de_entregar(pronta, config)):
+                entregar_aula(engine, config, ponte, pronta.id, avisar=avisar)
         except Exception as erro:
             log.exception("Falha ao processar %s", aula.titulo)
             _salvar(engine, aula, etapa="erro", erro=f"{type(erro).__name__}: {str(erro)[:200]}")
