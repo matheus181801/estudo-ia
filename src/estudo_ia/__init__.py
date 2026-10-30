@@ -21,6 +21,9 @@ def main() -> None:
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
+    diario = sub.add_parser("diario", help="gera o pacote completo da próxima sessão e entrega")
+    diario.add_argument("--so-gerar", action="store_true", help="só gera (texto, podcast e vídeo)")
+    diario.add_argument("--so-entregar", action="store_true", help="só entrega o pacote já gerado")
     video = sub.add_parser("video", help="gera o vídeo de um pacote já gerado")
     video.add_argument("--pasta", default="data/pacotes/teste", help="pasta do pacote (com pacote.json)")
     podcast = sub.add_parser("podcast", help="gera o podcast de um pacote já gerado")
@@ -109,6 +112,17 @@ def main() -> None:
         for aviso in resultado.avisos:
             print(f"! {aviso}")
         print(f"Vídeo pronto ({resultado.minutos} min, {resultado.megabytes} MB): {resultado.mp4}")
+
+    elif args.comando == "diario":
+        from estudo_ia.entrega import pipeline
+
+        pacote_id = None
+        if not args.so_entregar:
+            pacote_id = pipeline.gerar(engine, config)
+            print(f"Geração concluída (pacote {pacote_id}).")
+        if not args.so_gerar:
+            ok = pipeline.entregar(engine, config, pacote_id)
+            print("Entregue!" if ok else "A entrega falhou (veja os alertas).")
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar
