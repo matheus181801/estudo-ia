@@ -78,25 +78,20 @@ def dividir_em_blocos(falas: list[Fala], limite: int = PALAVRAS_POR_BLOCO) -> li
     return blocos
 
 
-def _falar_bloco(cliente: genai.Client, config: Config, bloco: list[Fala], destino: Path) -> Path:
-    """Um pedido ao Gemini TTS; tenta de novo com espera se bater no limite de uso."""
-    conteudo = [
-        {
-            "type": "text",
-            "text": fala.texto,
-            "annotations": [{"type": "speech_metadata", "speaker": fala.apresentador, "style": fala.estilo}],
-        }
-        for fala in bloco
-    ]
+def sintetizar(cliente: genai.Client, config: Config, conteudo: list[dict], speech_config,
+               destino: Path) -> Path:
+    """Um pedido ao Gemini TTS, salvo como WAV.
+
+    Tenta de novo com espera crescente se der erro (no plano gratuito é comum
+    bater no limite de pedidos por minuto). Usado pelo podcast e pelo vídeo.
+    """
     for tentativa in range(5):
         try:
             resposta = cliente.interactions.create(
                 model=config.gemini_modelo_tts,
                 input=[{"type": "user_input", "content": conteudo}],
                 response_format={"type": "audio"},
-                generation_config={"speech_config": {
-                    "speakers": [{"speaker": nome, "voice": voz} for nome, voz in APRESENTADORES.items()],
-                }},
+                generation_config={"speech_config": speech_config},
             )
             # A resposta já vem como WAV completo (com cabeçalho), em base64.
             destino.write_bytes(base64.b64decode(resposta.output_audio.data))
@@ -106,6 +101,19 @@ def _falar_bloco(cliente: genai.Client, config: Config, bloco: list[Fala], desti
                 raise
             time.sleep(20 * (tentativa + 1))  # espera crescente: 20s, 40s, 60s...
     return destino
+
+
+def _falar_bloco(cliente: genai.Client, config: Config, bloco: list[Fala], destino: Path) -> Path:
+    conteudo = [
+        {
+            "type": "text",
+            "text": fala.texto,
+            "annotations": [{"type": "speech_metadata", "speaker": fala.apresentador, "style": fala.estilo}],
+        }
+        for fala in bloco
+    ]
+    vozes = {"speakers": [{"speaker": nome, "voice": voz} for nome, voz in APRESENTADORES.items()]}
+    return sintetizar(cliente, config, conteudo, vozes, destino)
 
 
 def gerar_audio_tts(cliente_claude: anthropic.Anthropic, cliente_gemini: genai.Client,

@@ -21,6 +21,8 @@ def main() -> None:
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
+    video = sub.add_parser("video", help="gera o vídeo de um pacote já gerado")
+    video.add_argument("--pasta", default="data/pacotes/teste", help="pasta do pacote (com pacote.json)")
     podcast = sub.add_parser("podcast", help="gera o podcast de um pacote já gerado")
     podcast.add_argument("--pasta", default="data/pacotes/teste", help="pasta do pacote (com pacote.json)")
     podcast.add_argument("--fallback", action="store_true", help="pula o NotebookLM e usa o Gemini TTS")
@@ -95,6 +97,18 @@ def main() -> None:
         for aviso in resultado.avisos:
             print(f"! {aviso}")
         print(f"Podcast pronto ({resultado.origem}, {resultado.minutos} min): {resultado.mp3}")
+
+    elif args.comando == "video":
+        from pathlib import Path
+
+        from estudo_ia.pacote.gerador import carregar_pacote
+        from estudo_ia.video.servico import gerar_video
+
+        pasta = Path(args.pasta)
+        resultado = gerar_video(carregar_pacote(pasta / "pacote.json"), pasta, config)
+        for aviso in resultado.avisos:
+            print(f"! {aviso}")
+        print(f"Vídeo pronto ({resultado.minutos} min, {resultado.megabytes} MB): {resultado.mp4}")
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar

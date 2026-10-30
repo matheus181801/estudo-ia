@@ -1,0 +1,47 @@
+{#- Um slide do vídeo, no tamanho exato de um quadro 720p (1280×720). -#}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    font-family: "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    background: linear-gradient(135deg, #2e1065 0%, #6d28d9 55%, #db2777 100%);
+    color: #fff; position: relative;
+  }
+  .bolha { position: absolute; border-radius: 50%; background: rgba(255,255,255,.07); }
+  .b1 { width: 520px; height: 520px; right: -160px; top: -200px; }
+  .b2 { width: 300px; height: 300px; left: -120px; bottom: -140px; }
+  .topo { position: absolute; top: 40px; left: 72px; right: 72px; display: flex; justify-content: space-between;
+          font-size: 20px; letter-spacing: 2px; text-transform: uppercase; opacity: .8; }
+  .conteudo { position: absolute; top: 120px; left: 72px; right: 72px; bottom: 110px;
+              display: flex; flex-direction: column; justify-content: center; }
+  h1 { font-size: {{ 64 if (s.titulo|length) < 40 else 52 }}px; line-height: 1.12; margin-bottom: 36px; font-weight: 800; }
+  ul { list-style: none; }
+  li { font-size: 32px; line-height: 1.35; margin-bottom: 20px; padding: 16px 24px 16px 64px; position: relative;
+       background: rgba(255,255,255,.12); border-radius: 18px; }
+  li::before { content: ""; position: absolute; left: 26px; top: 50%; width: 16px; height: 16px; margin-top: -8px;
+               border-radius: 50%; background: #fbbf24; }
+  .capa h1 { font-size: 72px; }
+  .capa .sub { font-size: 30px; opacity: .9; }
+  .rodape { position: absolute; left: 72px; right: 72px; bottom: 44px; height: 8px; border-radius: 4px;
+            background: rgba(255,255,255,.2); }
+  .progresso { height: 8px; border-radius: 4px; background: #fbbf24; width: {{ (100 * numero / total) | round(1) }}%; }
+</style>
+</head>
+<body>
+  <div class="bolha b1"></div><div class="bolha b2"></div>
+  <div class="topo"><span>📚 Estudo IA · {{ livro }}</span><span>{{ numero }} / {{ total }}</span></div>
+  <div class="conteudo {{ 'capa' if capa else '' }}">
+    <h1>{{ s.titulo }}</h1>
+    {% if capa %}
+      <div class="sub">Sessão {{ sessao }} · {{ autor }}</div>
+    {% else %}
+      <ul>{% for t in s.topicos %}<li>{{ t }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  <div class="rodape"><div class="progresso"></div></div>
+</body>
+</html>
