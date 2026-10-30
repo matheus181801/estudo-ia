@@ -21,6 +21,8 @@ def main() -> None:
     perguntar = sub.add_parser("perguntar", help="faz uma pergunta sobre os livros")
     perguntar.add_argument("pergunta")
     sub.add_parser("bot", help="liga o bot do Telegram")
+    sub.add_parser("servico", help="bot + agendador (o que roda na VPS)")
+    sub.add_parser("enviar-banco", help="manda o banco compactado no Telegram (para /importar na VPS)")
     diario = sub.add_parser("diario", help="gera o pacote completo da próxima sessão e entrega")
     diario.add_argument("--so-gerar", action="store_true", help="só gera (texto, podcast e vídeo)")
     diario.add_argument("--so-entregar", action="store_true", help="só entrega o pacote já gerado")
@@ -123,6 +125,17 @@ def main() -> None:
         if not args.so_gerar:
             ok = pipeline.entregar(engine, config, pacote_id)
             print("Entregue!" if ok else "A entrega falhou (veja os alertas).")
+
+    elif args.comando == "servico":
+        from estudo_ia.agendador import rodar_servico
+
+        rodar_servico(config, engine)
+
+    elif args.comando == "enviar-banco":
+        from estudo_ia.bot.banco import enviar_banco
+
+        enviar_banco(config)
+        print("Banco enviado no Telegram. Na VPS, responda a essa mensagem com /importar.")
 
     elif args.comando == "bot":
         from estudo_ia.bot.app import rodar

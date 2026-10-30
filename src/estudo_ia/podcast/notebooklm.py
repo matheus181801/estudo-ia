@@ -12,6 +12,7 @@ um cookie obrigatório do Google (__Secure-1PSIDTS).
 """
 
 import asyncio
+import os
 from datetime import date
 from pathlib import Path
 
@@ -37,7 +38,10 @@ def _material(pacote: Pacote) -> str:
 
 
 async def _gerar(pacote: Pacote, destino: Path, limite_min: float, perfil: str) -> Path:
-    async with NotebookLMClient.from_storage(profile=perfil) as cliente:
+    # Na VPS a sessão vem da variável NOTEBOOKLM_AUTH_JSON (conteúdo do
+    # storage_state.json); um perfil explícito teria prioridade sobre ela.
+    perfil_usado = None if os.environ.get("NOTEBOOKLM_AUTH_JSON") else perfil
+    async with NotebookLMClient.from_storage(profile=perfil_usado) as cliente:
         caderno = await cliente.notebooks.create(f"Estudo IA — {date.today().isoformat()}")
         try:
             await cliente.sources.add_text(caderno.id, pacote.conteudo.titulo, _material(pacote), wait=True)

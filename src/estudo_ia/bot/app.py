@@ -10,6 +10,8 @@ outra pessoa são ignoradas em silêncio.
 
 import asyncio
 import logging
+import tempfile
+from pathlib import Path
 
 from sqlmodel import select
 from telegram import Update
@@ -17,6 +19,7 @@ from telegram.constants import ChatAction, ParseMode
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from estudo_ia.bot import roteador
+from estudo_ia.bot.banco import instalar_banco
 from estudo_ia.bot.formatacao import dividir, markdown_para_html, normalizar
 from estudo_ia.config import Config
 from estudo_ia.db import Livro, abrir_sessao
@@ -180,6 +183,28 @@ def criar_app(config: Config, engine) -> Application:
         await aviso.delete()
         await responder(update, texto_resposta)
 
+    async def cmd_importar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Responda à mensagem com o banco (.db.gz) usando /importar."""
+        original = update.message.reply_to_message
+        if not original or not original.document or not original.document.file_name.endswith(".db.gz"):
+            await update.message.reply_text("Responda à mensagem que tem o arquivo do banco (.db.gz) com /importar.")
+            return
+        aviso = await update.message.reply_text("📥 Baixando e conferindo o banco...")
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                arquivo = Path(tmp) / original.document.file_name
+                await (await original.document.get_file()).download_to_drive(arquivo)
+                backup = await asyncio.to_thread(instalar_banco, arquivo, config.caminho_banco)
+            engine.dispose()  # descarta conexões abertas no banco antigo
+        except Exception as erro:
+            log.exception("Erro ao importar banco")
+            await aviso.edit_text(f"😕 Não importei o banco: {erro}")
+            return
+        livros = listar_livros(engine)
+        await aviso.edit_text(f"✅ Banco importado: {len(livros)} livros, "
+                              f"{sum(c for _, c, _ in livros)} capítulos."
+                              + (" (cópia do antigo guardada)" if backup else ""))
+
     async def pergunta(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await processar(update, update.message.text)
 
@@ -199,6 +224,7 @@ def criar_app(config: Config, engine) -> Application:
     app.add_handler(CommandHandler("pular", cmd_pular, filters=so_matheus))
     app.add_handler(CommandHandler("pacote", cmd_pacote, filters=so_matheus))
     app.add_handler(CommandHandler("geral", cmd_geral, filters=so_matheus))
+    app.add_handler(CommandHandler("importar", cmd_importar, filters=so_matheus))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & so_matheus, pergunta))
     return app
 

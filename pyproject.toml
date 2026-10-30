@@ -5,6 +5,7 @@ description = "Automação diária de estudos com RAG, bot no Telegram, podcast 
 requires-python = ">=3.12"
 dependencies = [
     "anthropic>=2.3.0",
+    "apscheduler>=3.11.3",
     "google-genai>=2.34.0",
     "jinja2>=3.1.6",
     "notebooklm-py[browser]>=0.8.6",
